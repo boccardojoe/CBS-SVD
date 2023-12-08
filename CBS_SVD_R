@@ -1,0 +1,98 @@
+CBS_SVD_R <- function(X,rank=1,ku,kv,epsilon=.05)
+{
+  #Checks to make sure rank and length of ku and kv are the same
+  if(length(ku) != rank)
+  {
+    print("Mismatch between desired ranku and number of input parameters for U")
+    break
+  }
+  if(length(kv) != rank)
+  {
+    print("Mismatch between desired ranku and number of input parameters for V")
+    break
+  }
+  
+  #Set up matrices and lists
+  U = matrix(NA,nrow=nrow(X),ncol=rank)
+  V = matrix(NA,nrow=ncol(X),ncol=rank)
+  QU = matrix(NA,nrow=nrow(X),ncol=rank)
+  QV = matrix(NA,nrow=ncol(X),ncol=rank)
+  U.selected = list()
+  V.selected = list()
+  QU.selected = list()
+  QV.selected = list()
+  #Create identity matrices of size P and Q
+  IU=diag(nrow(X))
+  IV=diag(ncol(X))
+  svdX = svd(X)
+  singularvalues = as.vector(svdX$d[1:rank])
+  
+  for(r in 1:rank)
+  {
+    #For the first sparse singular vector, 
+    #calculate the singular vector using SVDEM
+    #and assign them to first column of QU and QV
+    if(r == 1)
+    {
+      CBSSVD = CBS_SVD(X,svdX,ku=ku[r],kv=kv[r])
+      QU[,r] = CBSSVD$u
+      QV[,r] = CBSSVD$v
+      U[,r] = CBSSVD$u
+      V[,r] = CBSSVD$v
+      U.selected[[r]] = CBSSVD$U.selected
+      V.selected[[r]] = CBSSVD$V.selected
+
+    }
+    ##############################################################################################
+    #Note:
+    # Project (I-QU(QU^T)) onto the data matrix to annihilate rank-1 information and run this
+    # through SVDEM to get a new u for rank-2 and calculate the next column of QU
+    # Basically a Gram-Schmidt process. Repeat similar process for V using the other
+    # projected matrix
+    #############################################################################################
+    else if(r > 1)
+    {
+      XU_proj = t(t(X) %*% (IU - QU[,1:(r-1)] %*% t(QU[,1:(r-1)])))
+      XV_proj = (X %*% (IV - QV[,1:(r-1)] %*% t(QV[,1:(r-1)])))
+      
+      #X_proj = X - QU[,1:(r-1)] %*% t(QV[,1:(r-1)])
+      
+      CBSSVDU = CBS_SVD(XU_proj,svd(XU_proj),ku=ku[r],kv=kv[r])
+      u = CBSSVDU$u
+      U[,r] = u
+      U.selected[[r]] = CBSSVDU$U.selected
+      QU_next = (IU - QU[,1:(r-1)] %*% t(QU[,1:(r-1)])) %*% u
+      QU[,r] = QU_next/norm(QU_next,type="2")
+      
+      CBSSVDV = CBS_SVD(XV_proj,svd(XV_proj),ku=ku[r],kv=kv[r])
+      v = CBSSVDV$v
+      V[,r] = v
+      V.selected[[r]] = CBSSVDV$V.selected
+      QV_next = (IV - QV[,1:(r-1)] %*% t(QV[,1:(r-1)])) %*% v
+      QV[,r] = QV_next/norm(QV_next,type="2")
+      
+
+
+    }
+  }
+  #############################################
+  # Checks the orthogonality of U,V QU,QV
+  # By Gram-Schmidt process, QU and QV should
+  # be orthogonal matrices
+  ############################################
+  U.check = t(U) %*% U
+  V.check = t(V) %*% V
+
+  return(list(rank=rank,
+              epsilon=epsilon,
+              D = singularvalues,
+              ku = ku,
+              kv = kv,
+              U = U,
+              V = V,
+              U.selected=U.selected,
+              V.selected=V.selected,
+              U.check=U.check,
+              V.check=V.check))
+  
+}
