@@ -1,0 +1,89 @@
+
+CBS_SVD = function(X,SVDx=svd(X),ku,kv,epsilon=.05){
+
+  SVD = svd(X)
+  u1 = SVD$u[,1]
+  v1 = SVD$v[,1]
+  d1 = SVD$d[1]
+
+  repeat {
+    
+    if(ku >= nrow(X))
+    {
+      u1=u1
+      names(u1) = rownames(X)
+      break
+    }
+    
+    yp = t(X) %*% u1  
+    
+    fp = X %*% yp
+    sumsqryp = as.numeric((t(yp) %*% yp))
+    u1_star = as.vector(fp)/(norm(yp,type="2"))
+    
+    sp = sort(abs(u1_star), decreasing = TRUE)
+    pip_ = order(abs(u1_star), decreasing = TRUE)
+    u1_tp1 = integer(length = nrow(X))
+    
+    for (i in 1:ku) {
+      u1_tp1[1:i] = u1_tp1[1:i] + (sp[i]-sp[i+1])
+    }
+    
+    u1_tp1 = u1_tp1[order(pip_)]
+    
+    u1_tp1 = u1_tp1*sign(u1_star)/norm(u1_tp1, type = "2")
+    
+    converge_p = abs(t(u1_tp1) %*% u1)
+    
+    if (converge_p>(1-epsilon)) {
+      u1 = u1_tp1
+      names(u1) = rownames(X)
+      break
+    }
+    u1 = u1_tp1
+  }
+  
+  repeat {
+    
+    if(kv >= ncol(X))
+    {
+      v1=v1
+      names(v1) = colnames(X)
+      break
+    }
+    
+    yq = X %*% v1  
+    
+    fq = t(X) %*% yq
+    sumsqryq = (t(yq) %*% yq)
+    v1_star = as.vector(fq)/(norm(yq,type="2"))
+    
+    sq= sort(abs(v1_star), decreasing = TRUE)
+    piq_ = order(abs(v1_star), decreasing = TRUE)
+    v1_tp1 = integer(length = ncol(X))
+    
+    for (j in 1:kv) {
+      v1_tp1[1:j] = v1_tp1[1:j] + (sq[j]-sq[j+1])
+    }
+    
+    v1_tp1 = v1_tp1[order(piq_)]
+    
+    v1_tp1 = v1_tp1*sign(v1_star)/norm(v1_tp1, type = "2")
+    
+    converge_q = abs(t(v1_tp1) %*% v1)
+    
+    if (converge_q>(1-epsilon)) {
+      v1 = v1_tp1
+      names(v1) = colnames(X)
+      break
+    }
+    v1 = v1_tp1
+  }
+  
+  return(list(u = u1, 
+              v = v1, 
+              d = d1, 
+              U.selected = which(u1 != 0), 
+              V.selected = which(v1 != 0)))
+}
+
