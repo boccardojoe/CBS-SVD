@@ -25,7 +25,7 @@ Function outputs:
 # CBS_SVD_R
 Function outputs:
   1. epsilon : The convergence threshold use in the function.
-  2. D : The first _r_ singular values where _r_=rank.
+  2. D : The first _r_ singular values where rank=_r_.
   3. ku : Vector of cardinalities of length=_r_ for the row variables of the similarity matrix.
   4. kv : Vector of cardinalities of length=_r_ for the column variables of the similarity matrix.
   5. U : Matrix of sparse vectors for the similarity row variables where the number of columns in this 
