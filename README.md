@@ -14,7 +14,7 @@ Function inputs:
           otherwise vector of length=rank).
   6. epsilon : The threshold of convergence to 1 in the inner product of the current sparse vector with its previous iteration (default is epsilon=0.05). 
 
-# CBS_SVD
+## CBS_SVD
 Function outputs:
   1. u : The rank 1 sparse vector for the similarity row variables.
   2. v : The rank 1 sparse vector for the similarity column variables.
@@ -22,7 +22,7 @@ Function outputs:
   4. U.selected : The position values of the non zero elements of vector u. 
   5. V.selected : The position values of the non zero elements of vector v.
 
-# CBS_SVD_R
+## CBS_SVD_R
 Function outputs:
   1. epsilon : The convergence threshold use in the function.
   2. D : The first _r_ singular values where rank=_r_.
