@@ -1,4 +1,4 @@
-# CBS_SVD and CBS_SVD_R
+## CBS_SVD and CBS_SVD_R
 
 The fuctions will produce the rank 1 (CBS_SVD) or rank _r_ (CBS_SVD_R) sparse singular vectors for chosen cardinalities.
 
