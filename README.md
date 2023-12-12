@@ -1,4 +1,7 @@
 # CBS_SVD and CBS_SVD_R
+
+The fuctions will produce the rank 1 (CBS_SVD) or rank _r_ (CBS_SVD_R) sparse singular vectors for chosen cardinalities.
+
 No additional R packages are reqired to run either CBS_SVD or CBS_SVD_R functions.
 
 Function inputs:
