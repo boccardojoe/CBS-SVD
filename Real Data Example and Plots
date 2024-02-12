@@ -17,6 +17,11 @@ library(rstatix)
 # https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE220622 
 # file name "GSE220622_processed_M-value.tsv.gz" for the methylations
 
+
+#############################
+# Data Preparation
+#############################
+
 # Data Import for Transcripts
 GSE221615_normalizedCounts = read_delim("C:/*Path*/GSE221615_normalizedCounts.tsv/GSE221615_normalizedCounts.tsv", 
     delim = "\t", escape_double = FALSE, 
@@ -97,10 +102,6 @@ bp_dist_matrix_mean_fun2 = function(SM, pos_M, pos_T){
 
 # Correlation Matrix
 Corr_chr_1_tran_methyl = cor(t(Methyl_chr_1_v1_c_data),t(Gene_chr_1_c_data), method = "pearson")
-
-
-# SVD of Correlation Matrix
-SVD_Corr_chr_1_tran_methyl = svd(Corr_chr_1_tran_methyl)
 
 ##################################################################################
 # Example Code to run a MC resampling
