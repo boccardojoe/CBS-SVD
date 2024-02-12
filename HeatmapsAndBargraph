@@ -1,0 +1,105 @@
+library(reshape2)
+library(ggplot2)
+library(grid)
+library(gridExtra)
+library(PMA)
+
+#Simulate the matrix for Figures 1 and 2
+set.seed(7)
+P = 200
+Q = 100
+
+nsignalP1 = 25
+nsignalQ1 = 40
+
+mean1 = 2
+sd1   = 1
+
+X = matrix(NA,nrow=P,ncol=Q)
+for(i in 1:P)
+{
+  for(j in 1:Q)
+  {
+    if(i <= nsignalP1 & j <= nsignalQ1)
+    {
+      X[i,j] = rnorm(1,mean=mean1,sd=sd1)
+    }
+    else
+    {
+      X[i,j] = rnorm(1,mean=0,sd=1)
+    }
+  }
+}
+
+#Run EM_SVD Rank 1
+emsvd1 = CBS_SVD_R(X,rank=1,ku=c(25),kv=c(40))
+#Gather appropriate full SVD vectors and sparse SVD vectors
+svdX = svd(X)
+D.r1=svdX$d[1]
+FullU1 = svdX$u[,1]
+FullV1 = svdX$v[,1]
+SparseU = emsvd1$U
+SparseV = emsvd1$V
+RecombX = SparseU %*% D.r1 %*% t(SparseV)
+
+#Start code for Figure 1
+
+X.melt = melt(X)
+heatmp1.wlegend <- ggplot(X.melt,aes(x=Var2,y=rev(Var1),fill=value)) +
+  geom_raster() +
+  scale_x_continuous(expand=c(0,0)) +
+  scale_y_continuous(expand=c(0,0)) +
+  scale_fill_gradient2(low="gray0",mid="white",high="gray0",
+                       limits=c(-5,5),guide = "colourbar") +
+  theme(axis.title=element_blank(),
+        axis.text=element_blank(),
+        axis.ticks=element_blank(),
+        legend.position = "bottom",
+        legend.key.size = unit(1.3,"cm"),
+        legend.text = element_text(size=12),
+        legend.title = element_blank())
+heatmp1.wlegend
+
+legend <- cowplot::get_legend(heatmp1.wlegend)
+#legend
+
+heatmp1.wolegend <- ggplot(X.melt,aes(x=Var2,y=rev(Var1),fill=value)) +
+  geom_raster() +
+  scale_x_continuous(expand=c(0,0)) +
+  scale_y_continuous(expand=c(0,0)) +
+  scale_fill_gradient2(low="gray0",mid="white",high="gray0",
+                       limits=c(-5,5)) +
+  theme(axis.title=element_blank(),
+        axis.text=element_blank(),
+        axis.ticks=element_blank(),
+        legend.position = "none",
+        panel.border = element_rect(color="black",fill=NA,linewidth=1),
+        plot.margin = unit(c(.1,-.15,.1,.2),"cm"))
+heatmp1.wolegend
+
+fullU1.df = as.data.frame(FullU1)
+fullV1.df = as.data.frame(FullV1)
+
+bp1 <- ggplot(as.data.frame(fullV1.df),aes(x=as.numeric(rownames(fullV1.df)),y=FullV1)) +
+  geom_bar(stat="identity",width = 1.0) +
+  scale_y_continuous(position="right") +
+  scale_x_continuous(expand = c(0,0)) +
+  theme_minimal() +
+  theme(axis.title   = element_blank(),
+        axis.text.x  = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.line.y  = element_line(color="black",size=0.5),
+        axis.text.y  = element_text(size=12,color="black"),
+        plot.margin = unit(c(.2,-1.15,.2,.2),"cm"))
+
+bp2 <- ggplot(as.data.frame(fullU1.df),aes(x=as.numeric(rownames(fullU1.df)),y=FullU1)) +
+  geom_bar(stat="identity",width = 1.0) +
+  coord_flip() +
+  scale_x_reverse(expand=c(0,0)) +
+  theme_minimal() +
+  theme(axis.title   = element_blank(),
+        axis.text.y  = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.line.x  = element_line(color="black",size=0.5),
+        axis.text.x  = element_text(size=12,color="black"),
+        plot.margin = unit(c(.2,.2,-.20,.2),"cm"))
