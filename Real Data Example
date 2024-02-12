@@ -1,3 +1,16 @@
+# Required libraries
+library(readxl)
+library(tidyverse)
+library(dplyr)
+library(BiocManager)
+BiocManager::install("biomaRt")
+library(biomaRt)
+library(reshape2)
+library(ggplot2)
+library(ggpubr)
+library(rstatix)
+
+
 # Data available at
 # https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE221615 
 # file name "GSE221615_normalizedCounts.tsv.gz" for transcripts and
@@ -31,6 +44,8 @@ Methyl_sites = as.data.frame(GSE220622_processed_M_value$ID_REF)
 
 # Attach additional methylation site information to data
 # Additional methylation site information found at 
+# https://support.illumina.com/downloads/infinium-methylationepic-v1-0-product-files.html
+# Note: Remove unnecessary header info from file first ("clean" version)
 infinium_methylationepic_v1.0_b5 = as.data.frame(read_csv("C:/*Path*/infinium-methylationepic-v-1-0-b5-manifest-file-csv/infinium-methylationepic-v-1-0-b5-manifest-file_clean.txt"))
 Illumin_Methyl_Chr_v1 = as.data.frame(infinium_methylationepic_v1.0_b5[,c(2,12,19,50,51)])
 colnames(Illumin_Methyl_Chr_v1)[1] = "ID_REF"
@@ -62,3 +77,30 @@ Methyl_chr_1_v1_c = Methyl_chr_1_v1_c %>%
 head(Methyl_chr_1_v1_c)
 Methyl_chr_1_v1_c_pos = Methyl_chr_1_v1_c[,c(1,2,3,4)]
 Methyl_chr_1_v1_c_data = Methyl_chr_1_v1_c[,-c(2,3,4)]
+
+# Distance Matrix Functions
+bp_dist_matrix_mean_fun2 = function(SM, pos_M, pos_T){
+  sel_pos_T = pos_T[pos_T$ens_gene %in% colnames(SM),]
+  sel_pos_M = pos_M[pos_M$ID_REF %in% rownames(SM),]
+  loc_diff = matrix(NA,length(sel_pos_M$ID_REF), length(sel_pos_T$ens_gene) )
+  for (i in 1:length(sel_pos_M$ID_REF)) {
+    for (j in 1:length(sel_pos_T$ens_gene)) {
+      loc_diff[i,j] = min(abs(sel_pos_M$CpG_start[i] - sel_pos_T$start_position[j]),abs(sel_pos_M$CpG_start[i] - sel_pos_T$end_position[j]),abs(sel_pos_M$CpG_end[i] - sel_pos_T$start_position[j]),abs(sel_pos_M$CpG_end[i] - sel_pos_T$end_position[j])) 
+    }
+    
+  }
+  sub_mat_mean = mean(loc_diff)
+  sub_mat_median = median(loc_diff)
+  sub_mat_var = var(as.vector(loc_diff))
+  return(list(sub_mat_mean,sub_mat_median,sub_mat_var,loc_diff))
+}
+
+# Correlation Matrix
+Corr_chr_1_tran_methyl = cor(t(Methyl_chr_1_v1_c_data),t(Gene_chr_1_c_data), method = "pearson")
+
+
+# SVD of Correlation Matrix
+SVD_Corr_chr_1_tran_methyl = svd(Corr_chr_1_tran_methyl)
+
+
+
