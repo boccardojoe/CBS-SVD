@@ -106,6 +106,7 @@ SVD_Corr_chr_1_tran_methyl = svd(Corr_chr_1_tran_methyl)
 # Example Code to run a MC resampling
 # Note: Default here is B = 10,000 resamples, G = 10 is the transcript cardinality
 # and M = 100 in the methylation cardinality
+# G and M may be replaced for any desired cardinalities
 ##################################################################################
 
 B = 1000
@@ -113,18 +114,16 @@ G = 10
 M = 100
 MC_10_100_data2 = matrix(NA, B, 4) 
   
-SVDEM_R3_results = SVDEM_R3(Corr_chr_1_tran_methyl, SVD_Corr_chr_1_tran_methyl, rank = 1,ku = M, kv = G, epsilon=.05 )
-sub_rows = as.vector(SVDEM_R3_results$U.selected[[1]])
+CBS_SVD_R_results = CBS_SVD_R(Corr_chr_1_tran_methyl, rank = 1,ku = M, kv = G, epsilon=.05 )
+sub_rows = as.vector(CBS_SVD_R_results$U.selected[[1]])
 sub_row_names = rownames(Corr_chr_1_tran_methyl)[sub_rows]
-sub_cols = as.vector(SVDEM_R3_results$V.selected[[1]])
+sub_cols = as.vector(CBS_SVD_R_results$V.selected[[1]])
 sub_col_names = colnames(Corr_chr_1_tran_methyl)[sub_cols]
 ###Selected submatrix
 Select_submat = Corbi::submatrix(Corr_chr_1_tran_methyl,sub_rows,sub_cols)
 colnames(Select_submat) = sub_col_names
 rownames(Select_submat) = sub_row_names
 Select_mean_bp_dist = bp_dist_matrix_mean_fun2(Select_submat,Methyl_chr_1_v1_c_pos,Gene_chr_1_c_pos)
-
-
 
 for (i in 1:B) {
 ###Random submatrix
@@ -134,27 +133,38 @@ rand_sub_cols = sample(seq(1,n_col,1),G,replace = FALSE)
 rand_sub_col_names = colnames(Corr_chr_1_tran_methyl)[rand_sub_cols]
 rand_submat = Corbi::submatrix(Corr_chr_1_tran_methyl,rand_sub_rows,rand_sub_cols)
 colnames(rand_submat) = rand_sub_col_names
-
 rownames(rand_submat) = rand_sub_row_names
-
   
 Rand_mean_bp_dist = bp_dist_matrix_mean_fun2(rand_submat,Methyl_chr_1_v1_c_pos,Gene_chr_1_c_pos)
-  
   MC_10_100_data2[i,1] = Select_mean_bp_dist[[1]]
   MC_10_100_data2[i,2] = Rand_mean_bp_dist[[1]]
   MC_10_100_data2[i,3] = Select_mean_bp_dist[[2]]
-  MC_10_100_data2[i,4] = Rand_mean_bp_dist[[2]]
-  
+  MC_10_100_data2[i,4] = Rand_mean_bp_dist[[2]]  
 }
-
-
 })
 
 MC_10_100_data2 = as.data.frame(MC_10_100_data2)
 colnames(MC_10_100_data2) = c("Select Mean", "Random Mean", "Select Median", "Random Median")
 MC_10_100_data2$`S-R Mean` = MC_10_100_data2$`Select Mean` - MC_10_100_data2$`Random Mean`
 MC_10_100_data2$`S-R Median` = MC_10_100_data2$`Select Median` - MC_10_100_data2$`Random Median`
-
 MC_10_100_results2 = data.frame(MC_10_100_data2_diff_mean_avg = mean(MC_10_100_data2$`S-R Mean`),MC_10_100_data2_diff_mean_sd = sqrt(var(MC_10_100_data2$`S-R Mean`)), MC_10_100_data_diff2_median_avg = mean(MC_10_100_data2$`S-R Median`),MC_10_100_data2_diff_median_sd = sqrt(var(MC_10_100_data2$`S-R Median`)))
-
 MC_10_100_results2
+
+########################################
+# Production of Figure 4
+# Note: Necessary to first produce all MC_?_?_data2 and MC_?_?_results2 wanted
+########################################
+X = c("10 G, 100 DNAm","15 G, 150 DNAm","25 G, 250 DNAm","50 G, 500 DNAm","100 G, 1000 DNAm")
+Xf = factor(X,levels = c("10 G, 100 DNAm","15 G, 150 DNAm","25 G, 250 DNAm","50 G, 500 DNAm","100 G, 1000 DNAm"))
+Y2 = c(MC_10_100_results2[1]/1000000, MC_15_150_results2[1]/1000000, MC_25_250_results2[1]/1000000, MC_50_500_results2[1]/1000000, MC_100_1000_results2[1]/1000000)
+Mean_diff_data4 = data.frame(list(Type = Xf, Mbp = c(Y2[[1]], Y2[[2]], Y2[[3]], Y2[[4]], Y2[[5]])))
+Mean_diff_data4$LB = c(quantile(MC_10_100_data2[,5],probs = 0.025)/1000000, quantile(MC_15_150_data2[,5],probs = 0.025)/1000000, quantile(MC_25_250_data2[,5],probs = 0.025)/1000000, quantile(MC_50_500_data2[,5],probs = 0.025)/1000000, quantile(MC_100_1000_data2[,5],probs = 0.025)/1000000)
+Mean_diff_data4$UB = c(quantile(MC_10_100_data2[,5],probs = 0.975)/1000000, quantile(MC_15_150_data2[,5],probs = 0.975)/1000000, quantile(MC_25_250_data2[,5],probs = 0.975)/1000000, quantile(MC_50_500_data2[,5],probs = 0.975)/1000000, quantile(MC_100_1000_data2[,5],probs = 0.975)/1000000)
+Mean_diff_data4_plot.1 = ggplot(Mean_diff_data4,aes(x = Type,y = Mbp)) +
+  geom_point()+
+  geom_errorbar(aes(ymin=LB, ymax=UB), width=.2,
+                 position=position_dodge(0.05)) +
+  theme(axis.text.x=element_text(angle=-45,hjust=.2),axis.title.x = element_blank()) + 
+  scale_y_continuous(n.breaks = 17)
+ 
+Mean_diff_data4_plot.1
