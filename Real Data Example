@@ -1,1 +1,16 @@
+# Data available at
+# https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE221615 
+# file name "GSE221615_normalizedCounts.tsv.gz" for transcripts and
+# https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE220622 
+# file name "GSE220622_processed_M-value.tsv.gz" for the methylations
 
+# Data Import for Transcripts
+GSE221615_normalizedCounts = read_delim("C:/*Path*/GSE221615_normalizedCounts.tsv/GSE221615_normalizedCounts.tsv", 
+    delim = "\t", escape_double = FALSE, 
+    trim_ws = TRUE)
+
+# Data Import for Methylation
+GSE220622_processed_M_value = as.data.frame(read_delim("C:/*Path*/GSE220622_processed_M-value.tsv/GSE220622_processed_M-value.tsv", 
+    delim = "\t", escape_double = FALSE, 
+    trim_ws = TRUE))
+GSE220622_processed_M_value = GSE220622_processed_M_value[,-c(seq(3,783,2))]
