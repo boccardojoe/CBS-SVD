@@ -102,5 +102,59 @@ Corr_chr_1_tran_methyl = cor(t(Methyl_chr_1_v1_c_data),t(Gene_chr_1_c_data), met
 # SVD of Correlation Matrix
 SVD_Corr_chr_1_tran_methyl = svd(Corr_chr_1_tran_methyl)
 
+##################################################################################
+# Example Code to run a MC resampling
+# Note: Default here is B = 10,000 resamples, G = 10 is the transcript cardinality
+# and M = 100 in the methylation cardinality
+##################################################################################
+
+B = 1000
+G = 10
+M = 100
+MC_10_100_data2 = matrix(NA, B, 4) 
+  
+SVDEM_R3_results = SVDEM_R3(Corr_chr_1_tran_methyl, SVD_Corr_chr_1_tran_methyl, rank = 1,ku = M, kv = G, epsilon=.05 )
+sub_rows = as.vector(SVDEM_R3_results$U.selected[[1]])
+sub_row_names = rownames(Corr_chr_1_tran_methyl)[sub_rows]
+sub_cols = as.vector(SVDEM_R3_results$V.selected[[1]])
+sub_col_names = colnames(Corr_chr_1_tran_methyl)[sub_cols]
+###Selected submatrix
+Select_submat = Corbi::submatrix(Corr_chr_1_tran_methyl,sub_rows,sub_cols)
+colnames(Select_submat) = sub_col_names
+rownames(Select_submat) = sub_row_names
+Select_mean_bp_dist = bp_dist_matrix_mean_fun2(Select_submat,Methyl_chr_1_v1_c_pos,Gene_chr_1_c_pos)
 
 
+
+for (i in 1:B) {
+###Random submatrix
+rand_sub_rows = sample(seq(1,n_row,1),M,replace = FALSE)
+rand_sub_row_names = rownames(Corr_chr_1_tran_methyl)[rand_sub_rows]
+rand_sub_cols = sample(seq(1,n_col,1),G,replace = FALSE)
+rand_sub_col_names = colnames(Corr_chr_1_tran_methyl)[rand_sub_cols]
+rand_submat = Corbi::submatrix(Corr_chr_1_tran_methyl,rand_sub_rows,rand_sub_cols)
+colnames(rand_submat) = rand_sub_col_names
+
+rownames(rand_submat) = rand_sub_row_names
+
+  
+Rand_mean_bp_dist = bp_dist_matrix_mean_fun2(rand_submat,Methyl_chr_1_v1_c_pos,Gene_chr_1_c_pos)
+  
+  MC_10_100_data2[i,1] = Select_mean_bp_dist[[1]]
+  MC_10_100_data2[i,2] = Rand_mean_bp_dist[[1]]
+  MC_10_100_data2[i,3] = Select_mean_bp_dist[[2]]
+  MC_10_100_data2[i,4] = Rand_mean_bp_dist[[2]]
+  
+}
+
+
+})
+
+MC_10_100_data2 = as.data.frame(MC_10_100_data2)
+colnames(MC_10_100_data2) = c("Select Mean", "Random Mean", "Select Median", "Random Median")
+MC_10_100_data2$`S-R Mean` = MC_10_100_data2$`Select Mean` - MC_10_100_data2$`Random Mean`
+MC_10_100_data2$`S-R Median` = MC_10_100_data2$`Select Median` - MC_10_100_data2$`Random Median`
+
+MC_10_100_results2 = data.frame(MC_10_100_data2_diff_mean_avg = mean(MC_10_100_data2$`S-R Mean`),MC_10_100_data2_diff_mean_sd = sqrt(var(MC_10_100_data2$`S-R Mean`)), MC_10_100_data_diff2_median_avg = mean(MC_10_100_data2$`S-R Median`),MC_10_100_data2_diff_median_sd = sqrt(var(MC_10_100_data2$`S-R Median`)))
+
+MC_10_100_results2
