@@ -9,8 +9,56 @@ GSE221615_normalizedCounts = read_delim("C:/*Path*/GSE221615_normalizedCounts.ts
     delim = "\t", escape_double = FALSE, 
     trim_ws = TRUE)
 
+# Import additional gene information, combine with trascript data, and select chromosome 1
+ensembl = useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl",host="useast.ensembl.org")
+chr_genes = getBM(attributes=c('ensembl_gene_id','chromosome_name','start_position','end_position'),filters =
+'chromosome_name', values = c(1:23, "X", "Y"), mart = ensembl)
+Gene_chr = merge(chr_genes,GSE221615_normalizedCounts,by="ens_gene")
+Gene_chr_1 = subset(Gene_chr, chromosome_name=="1")
+
+# Filter transcripts for complete cases
+Gene_chr_1_c = Gene_chr_1 %>%
+   filter(complete.cases(.))
+Gene_chr_1_c_pos = Gene_chr_1_c[,c(1,2,3,4)]
+Gene_chr_1_c_data = Gene_chr_1_c[,-c(2,3,4,5)]
+
 # Data Import for Methylation
 GSE220622_processed_M_value = as.data.frame(read_delim("C:/*Path*/GSE220622_processed_M-value.tsv/GSE220622_processed_M-value.tsv", 
     delim = "\t", escape_double = FALSE, 
     trim_ws = TRUE))
 GSE220622_processed_M_value = GSE220622_processed_M_value[,-c(seq(3,783,2))]
+Methyl_sites = as.data.frame(GSE220622_processed_M_value$ID_REF)
+
+# Attach additional methylation site information to data
+# Additional methylation site information found at 
+infinium_methylationepic_v1.0_b5 = as.data.frame(read_csv("C:/*Path*/infinium-methylationepic-v-1-0-b5-manifest-file-csv/infinium-methylationepic-v-1-0-b5-manifest-file_clean.txt"))
+Illumin_Methyl_Chr_v1 = as.data.frame(infinium_methylationepic_v1.0_b5[,c(2,12,19,50,51)])
+colnames(Illumin_Methyl_Chr_v1)[1] = "ID_REF"
+Split_chr = strsplit(Illumin_Methyl_Chr_v1$UCSC_CpG_Islands_Name, split = ":")
+Split_start_end = c()
+for (i in 1:866554) {
+  Split_start_end[i] = Split_chr[[i]][2]
+}
+Split_start_and_end = strsplit(Split_start_end, split = "-")
+CpG_start = c()
+for (i in 1:866554) {
+  CpG_start[i] = Split_start_and_end[[i]][1]
+}
+CpG_end = c()
+for (i in 1:866554) {
+  CpG_end[i] = Split_start_and_end[[i]][2]
+}
+Illumin_Methyl_Chr_v1_new = Illumin_Methyl_Chr_v1
+Illumin_Methyl_Chr_v1_new$CpG_start = CpG_start
+Illumin_Methyl_Chr_v1_new$CpG_end = CpG_end
+Illumin_Methyl_Chr_v1_new = Illumin_Methyl_Chr_v1_new[,-c(3,4,5)]
+Methyl_chr_v1 = merge(Illumin_Methyl_Chr_v1_new,GSE220622_processed_M_value,by="ID_REF")
+Methyl_chr_1_v1 = subset(Methyl_chr_v1, CHR=="1")
+Methyl_chr_1_v1_c = Methyl_chr_1_v1
+
+# Filter methylations for complete cases
+Methyl_chr_1_v1_c = Methyl_chr_1_v1_c %>%
+   filter(complete.cases(.))
+head(Methyl_chr_1_v1_c)
+Methyl_chr_1_v1_c_pos = Methyl_chr_1_v1_c[,c(1,2,3,4)]
+Methyl_chr_1_v1_c_data = Methyl_chr_1_v1_c[,-c(2,3,4)]
