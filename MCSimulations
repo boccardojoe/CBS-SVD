@@ -1,0 +1,214 @@
+###########################################################
+## Code to run MC simulations to compare                 ##
+## TPR and TNR at different cardinality levels           ##
+## and to compare with PMD at different signal strengths ##
+###########################################################
+
+
+library(PMA)
+
+MC=1000
+P = 200
+Q = 100
+nsignalP1 = 25
+nsignalQ1 = 40
+mean1 = c(1,.5,.25)
+sd1   = 1
+
+TrueSignalP = as.vector(seq(1:nsignalP1))
+TrueSignalQ = seq(1:nsignalQ1)
+
+TPR.U.low = matrix(NA,nrow=MC,ncol=length(mean1));TPR.U.correct = matrix(NA,nrow=MC,ncol=length(mean1));TPR.U.high = matrix(NA,nrow=MC,ncol=length(mean1));TPR.U.PMDCV = matrix(NA,nrow=MC,ncol=length(mean1));
+TPR.V.low = matrix(NA,nrow=MC,ncol=length(mean1));TPR.V.correct = matrix(NA,nrow=MC,ncol=length(mean1));TPR.V.high = matrix(NA,nrow=MC,ncol=length(mean1));TPR.V.PMDCV = matrix(NA,nrow=MC,ncol=length(mean1));
+TNR.U.low = matrix(NA,nrow=MC,ncol=length(mean1));TNR.U.correct = matrix(NA,nrow=MC,ncol=length(mean1));TNR.U.high = matrix(NA,nrow=MC,ncol=length(mean1));TNR.U.PMDCV = matrix(NA,nrow=MC,ncol=length(mean1));
+TNR.V.low = matrix(NA,nrow=MC,ncol=length(mean1));TNR.V.correct = matrix(NA,nrow=MC,ncol=length(mean1));TNR.V.high = matrix(NA,nrow=MC,ncol=length(mean1));TNR.V.PMDCV = matrix(NA,nrow=MC,ncol=length(mean1));
+
+for(m in 1:MC)
+{
+  
+  
+  
+  for(a in 1:length(mean1))
+  {
+    
+    print(paste("Starting MC:",m,"Mean:",mean1[a]))
+#Create random similarity matix
+X = matrix(NA,nrow=P,ncol=Q)
+for(i in 1:P)
+{
+  for(j in 1:Q)
+  {
+    if(i <= nsignalP1 & j <= nsignalQ1)
+    {
+      X[i,j] = rnorm(1,mean=mean1[a],sd=sd1)
+    }
+    else
+    {
+      X[i,j] = rnorm(1,mean=0,sd=1)
+    }
+  }
+}
+
+#Run the algorithm with low, correct, high cardinalities
+low.card     =  CBS_SVD_R(X,rank=1,ku=c(10),kv=c(20))
+correct.card =  CBS_SVD_R(X,rank=1,ku=c(25),kv=c(40))
+high.card    =  CBS_SVD_R(X,rank=1,ku=c(40),kv=c(60))
+#Run PMD algorithm with default CV
+optabs = PMD.cv(X,type="standard",nfold=10)$bestsumabs
+pmdcvresult = PMD(X,type="standard",sumabs=optabs)
+U.chosen.PMDCV = which(pmdcvresult$u != 0)
+V.chosen.PMDCV = which(pmdcvresult$v != 0)
+
+#Extract chosen variables
+U.chosen.low = as.vector(low.card$U.selected[[1]])
+V.chosen.low = as.vector(low.card$V.selected[[1]])
+
+U.chosen.correct = as.vector(correct.card$U.selected[[1]])
+V.chosen.correct = as.vector(correct.card$V.selected[[1]])
+
+U.chosen.high = as.vector(high.card$U.selected[[1]])
+V.chosen.high = as.vector(high.card$V.selected[[1]])
+
+#Calculate TPR, FPR for U and V directions
+
+TP.U.low  = sum(as.integer(as.logical(intersect(TrueSignalP,U.chosen.low))))
+FP.U.low  = sum(as.integer(as.logical(setdiff(U.chosen.low,TrueSignalP))))
+TN.U.low  = P - nsignalP1 - FP.U.low
+FN.U.low  = sum(as.integer(as.logical(setdiff(TrueSignalP,U.chosen.low))))
+
+TP.V.low  = sum(as.integer(as.logical(intersect(TrueSignalQ,V.chosen.low))))
+FP.V.low  = sum(as.integer(as.logical(setdiff(V.chosen.low,TrueSignalQ))))
+TN.V.low  = P - nsignalQ1 - FP.V.low
+FN.V.low  = sum(as.integer(as.logical(setdiff(TrueSignalQ,V.chosen.low))))
+
+TPR.U.low[m,a] = TP.U.low/(TP.U.low + FN.U.low);TPR.V.low[m,a] = TP.V.low/(TP.V.low + FN.V.low)
+TNR.U.low[m,a] = TN.U.low/(TN.U.low + FP.U.low);TNR.V.low[m,a] = TN.V.low/(TN.V.low + FP.V.low)
+
+TP.U.correct  = sum(as.integer(as.logical(intersect(TrueSignalP,U.chosen.correct))))
+FP.U.correct  = sum(as.integer(as.logical(setdiff(U.chosen.correct,TrueSignalP))))
+TN.U.correct  = P - nsignalP1 - FP.U.correct
+FN.U.correct  = sum(as.integer(as.logical(setdiff(TrueSignalP,U.chosen.correct))))
+
+TP.V.correct  = sum(as.integer(as.logical(intersect(TrueSignalQ,V.chosen.correct))))
+FP.V.correct  = sum(as.integer(as.logical(setdiff(V.chosen.correct,TrueSignalQ))))
+TN.V.correct  = P - nsignalQ1 - FP.V.correct
+FN.V.correct  = sum(as.integer(as.logical(setdiff(TrueSignalQ,V.chosen.correct))))
+
+TPR.U.correct[m,a] = TP.U.correct/(TP.U.correct + FN.U.correct)
+TPR.V.correct[m,a] = TP.V.correct/(TP.V.correct + FN.V.correct)
+TNR.U.correct[m,a] = TN.U.correct/(TN.U.correct + FP.U.correct)
+TNR.V.correct[m,a] = TN.V.correct/(TN.V.correct + FP.V.correct)
+
+TP.U.high  = sum(as.integer(as.logical(intersect(TrueSignalP,U.chosen.high))))
+FP.U.high  = sum(as.integer(as.logical(setdiff(U.chosen.high,TrueSignalP))))
+TN.U.high  = P - nsignalP1 - FP.U.high
+FN.U.high  = sum(as.integer(as.logical(setdiff(TrueSignalP,U.chosen.high))))
+
+TP.V.high  = sum(as.integer(as.logical(intersect(TrueSignalQ,V.chosen.high))))
+FP.V.high  = sum(as.integer(as.logical(setdiff(V.chosen.high,TrueSignalQ))))
+TN.V.high  = P - nsignalQ1 - FP.V.high
+FN.V.high  = sum(as.integer(as.logical(setdiff(TrueSignalQ,V.chosen.high))))
+
+TPR.U.high[m,a] = TP.U.high/(TP.U.high + FN.U.high);TPR.V.high[m,a] = TP.V.high/(TP.V.high + FN.V.high)
+TNR.U.high[m,a] = TN.U.high/(TN.U.high + FP.U.high);TNR.V.high[m,a] = TN.V.high/(TN.V.high + FP.V.high)
+
+TP.U.PMDCV  = sum(as.integer(as.logical(intersect(TrueSignalP,U.chosen.PMDCV))))
+FP.U.PMDCV  = sum(as.integer(as.logical(setdiff(U.chosen.PMDCV,TrueSignalP))))
+TN.U.PMDCV  = P - nsignalP1 - FP.U.PMDCV
+FN.U.PMDCV  = sum(as.integer(as.logical(setdiff(TrueSignalP,U.chosen.PMDCV))))
+
+TP.V.PMDCV  = sum(as.integer(as.logical(intersect(TrueSignalQ,V.chosen.PMDCV))))
+FP.V.PMDCV  = sum(as.integer(as.logical(setdiff(V.chosen.PMDCV,TrueSignalQ))))
+TN.V.PMDCV  = P - nsignalQ1 - FP.V.PMDCV
+FN.V.PMDCV  = sum(as.integer(as.logical(setdiff(TrueSignalQ,V.chosen.PMDCV))))
+
+TPR.U.PMDCV[m,a] = TP.U.PMDCV/(TP.U.PMDCV + FN.U.PMDCV);TPR.V.PMDCV[m,a] = TP.V.PMDCV/(TP.V.PMDCV + FN.V.PMDCV)
+TNR.U.PMDCV[m,a] = TN.U.PMDCV/(TN.U.PMDCV + FP.U.PMDCV);TNR.V.PMDCV[m,a] = TN.V.PMDCV/(TN.V.PMDCV + FP.V.PMDCV)
+  }
+}
+
+digit=3
+Sens.U.low = round(colMeans(TPR.U.low),digits=digit);Sens.V.low = round(colMeans(TPR.V.low),digits=digit);
+Spec.U.low = round(colMeans(TNR.U.low),digits=digit);Spec.V.low = round(colMeans(TNR.V.low),digits=digit);
+
+Sens.U.low.quant = round(colQuantiles(TPR.U.low,probs=c(.025,.975)),digits=digit)
+Sens.V.low.quant = round(colQuantiles(TPR.V.low,probs=c(.025,.975)),digits=digit)
+Spec.U.low.quant = round(colQuantiles(TNR.U.low,probs=c(.025,.975)),digits=digit)
+Spec.V.low.quant = round(colQuantiles(TNR.V.low,probs=c(.025,.975)),digits=digit)
+
+Sens.U.correct  = round(colMeans(TPR.U.correct),digits=digit);Sens.V.correct  = round(colMeans(TPR.V.correct),digits=digit)
+Spec.U.correct  = round(colMeans(TNR.U.correct),digits=digit);Spec.V.correct  = round(colMeans(TNR.V.correct),digits=digit)
+
+Sens.U.correct.quant = round(colQuantiles(TPR.U.correct,probs=c(.025,.975)),digits=digit)
+Sens.V.correct.quant = round(colQuantiles(TPR.V.correct,probs=c(.025,.975)),digits=digit)
+Spec.U.correct.quant = round(colQuantiles(TNR.U.correct,probs=c(.025,.975)),digits=digit)
+Spec.V.correct.quant = round(colQuantiles(TNR.V.correct,probs=c(.025,.975)),digits=digit)
+
+Sens.U.high  = round(colMeans(TPR.U.high),digits=digit);Sens.V.high  = round(colMeans(TPR.V.high),digits=digit);
+Spec.U.high  = round(colMeans(TNR.U.high),digits=digit);Spec.V.high  = round(colMeans(TNR.V.high),digits=digit);
+
+Sens.U.high.quant = round(colQuantiles(TPR.U.high,probs=c(.025,.975)),digits=digit)
+Sens.V.high.quant = round(colQuantiles(TPR.V.high,probs=c(.025,.975)),digits=digit)
+Spec.U.high.quant = round(colQuantiles(TNR.U.high,probs=c(.025,.975)),digits=digit)
+Spec.V.high.quant = round(colQuantiles(TNR.V.high,probs=c(.025,.975)),digits=digit)
+
+Sens.U.PMDCV  = round(colMeans(TPR.U.PMDCV),digits=digit);Sens.V.PMDCV  = round(colMeans(TPR.V.PMDCV),digits=digit);
+Spec.U.PMDCV  = round(colMeans(TNR.U.PMDCV),digits=digit);Spec.V.PMDCV  = round(colMeans(TNR.V.PMDCV),digits=digit);
+
+Sens.U.PMDCV.quant = round(colQuantiles(TPR.U.PMDCV,probs=c(.025,.975)),digits=digit)
+Sens.V.PMDCV.quant = round(colQuantiles(TPR.V.PMDCV,probs=c(.025,.975)),digits=digit)
+Spec.U.PMDCV.quant = round(colQuantiles(TNR.U.PMDCV,probs=c(.025,.975)),digits=digit)
+Spec.V.PMDCV.quant = round(colQuantiles(TNR.V.PMDCV,probs=c(.025,.975)),digits=digit)
+
+Col1 = c("Low Cardinality (10,15)","Correct Cardinality (25,40)", "High Cardinality (40,60)","PMD CV")
+
+tabledata = data.frame(list("High.sens.U" = c(paste0(Sens.U.low[1],    " (",Sens.U.low.quant[1,1],    ", ",Sens.U.low.quant[1,2],    ")"),
+                                              paste0(Sens.U.correct[1]," (",Sens.U.correct.quant[1,1],", ",Sens.U.correct.quant[1,2],")"),
+                                              paste0(Sens.U.high[1],   " (",Sens.U.high.quant[1,1],   ", ",Sens.U.high.quant[1,2],   ")"),
+                                              paste0(Sens.U.PMDCV[1],  " (",Sens.U.PMDCV.quant[1,1],  ", ",Sens.U.PMDCV.quant[1,2],  ")")),
+                            "High.spec.U" = c(paste0(Spec.U.low[1],    " (",Spec.U.low.quant[1,1],    ", ",Spec.U.low.quant[1,2],    ")"),
+                                              paste0(Spec.U.correct[1]," (",Spec.U.correct.quant[1,1],", ",Spec.U.correct.quant[1,2],")"),
+                                              paste0(Spec.U.high[1],   " (",Spec.U.high.quant[1,1],   ", ",Spec.U.high.quant[1,2],   ")"),
+                                              paste0(Spec.U.PMDCV[1],  " (",Spec.U.PMDCV.quant[1,1],  ", ",Spec.U.PMDCV.quant[1,2],  ")")),
+                            "High.sens.V" = c(paste0(Sens.V.low[1],    " (",Sens.V.low.quant[1,1],    ", ",Sens.V.low.quant[1,2],    ")"),
+                                              paste0(Sens.V.correct[1]," (",Sens.V.correct.quant[1,1],", ",Sens.V.correct.quant[1,2],")"),
+                                              paste0(Sens.V.high[1],   " (",Sens.V.high.quant[1,1],   ", ",Sens.V.high.quant[1,2],   ")"),
+                                              paste0(Sens.V.PMDCV[1],  " (",Sens.V.PMDCV.quant[1,1],  ", ",Sens.V.PMDCV.quant[1,2],  ")")),
+                            "High.spec.V" = c(paste0(Spec.V.low[1],    " (",Spec.V.low.quant[1,1],    ", ",Spec.V.low.quant[1,2],    ")"),
+                                              paste0(Spec.V.correct[1]," (",Spec.V.correct.quant[1,1],", ",Spec.V.correct.quant[1,2],")"),
+                                              paste0(Spec.V.high[1],   " (",Spec.V.high.quant[1,1],   ", ",Spec.V.high.quant[1,2],   ")"),
+                                              paste0(Spec.V.PMDCV[1],  " (",Spec.V.PMDCV.quant[1,1],  ", ",Spec.V.PMDCV.quant[1,2],  ")")),
+                            "Medium.sens.U" = c(paste0(Sens.U.low[2],  " (",Sens.U.low.quant[2,1],    ", ",Sens.U.low.quant[2,2],    ")"),
+                                              paste0(Sens.U.correct[2]," (",Sens.U.correct.quant[2,1],", ",Sens.U.correct.quant[2,2],")"),
+                                              paste0(Sens.U.high[2],   " (",Sens.U.high.quant[2,1],   ", ",Sens.U.high.quant[2,2],   ")"),
+                                              paste0(Sens.U.PMDCV[2],  " (",Sens.U.PMDCV.quant[2,1],  ", ",Sens.U.PMDCV.quant[2,2],  ")")),
+                            "Medium.spec.U" = c(paste0(Spec.U.low[1],  " (",Spec.U.low.quant[2,1],    ", ",Spec.U.low.quant[2,2],    ")"),
+                                              paste0(Spec.U.correct[2]," (",Spec.U.correct.quant[2,1],", ",Spec.U.correct.quant[2,2],")"),
+                                              paste0(Spec.U.high[2],   " (",Spec.U.high.quant[2,1],   ", ",Spec.U.high.quant[2,2],   ")"),
+                                              paste0(Spec.U.PMDCV[2],  " (",Spec.U.PMDCV.quant[2,1],  ", ",Spec.U.PMDCV.quant[2,2],  ")")),
+                            "Medium.sens.V" = c(paste0(Sens.V.low[2],  " (",Sens.V.low.quant[2,1],    ", ",Sens.V.low.quant[2,2],    ")"),
+                                              paste0(Sens.V.correct[2]," (",Sens.V.correct.quant[2,1],", ",Sens.V.correct.quant[2,2],")"),
+                                              paste0(Sens.V.high[2],   " (",Sens.V.high.quant[2,1],   ", ",Sens.V.high.quant[2,2],   ")"),
+                                              paste0(Sens.V.PMDCV[2],  " (",Sens.V.PMDCV.quant[2,1],  ", ",Sens.V.PMDCV.quant[2,2],  ")")),
+                            "Medium.spec.V" = c(paste0(Spec.V.low[2],  " (",Spec.V.low.quant[2,1],    ", ",Spec.V.low.quant[2,2],    ")"),
+                                              paste0(Spec.V.correct[2]," (",Spec.V.correct.quant[2,1],", ",Spec.V.correct.quant[2,2],")"),
+                                              paste0(Spec.V.high[2],   " (",Spec.V.high.quant[2,1],   ", ",Spec.V.high.quant[2,2],   ")"),
+                                              paste0(Spec.V.PMDCV[2],  " (",Spec.V.PMDCV.quant[2,1],  ", ",Spec.V.PMDCV.quant[2,2],  ")")),
+                            "Low.sens.U" = c(paste0(Sens.U.low[3],       " (",Sens.U.low.quant[3,1],    ", ",Sens.U.low.quant[3,2],    ")"),
+                                                paste0(Sens.U.correct[3]," (",Sens.U.correct.quant[3,1],", ",Sens.U.correct.quant[3,2],")"),
+                                                paste0(Sens.U.high[3],   " (",Sens.U.high.quant[3,1],   ", ",Sens.U.high.quant[3,2],   ")"),
+                                                paste0(Sens.U.PMDCV[3],  " (",Sens.U.PMDCV.quant[3,1],  ", ",Sens.U.PMDCV.quant[3,2],  ")")),
+                            "Low.spec.U" = c(paste0(Spec.U.low[3],       " (",Spec.U.low.quant[3,1],    ", ",Spec.U.low.quant[3,2],    ")"),
+                                                paste0(Spec.U.correct[3]," (",Spec.U.correct.quant[3,1],", ",Spec.U.correct.quant[3,2],")"),
+                                                paste0(Spec.U.high[3],   " (",Spec.U.high.quant[3,1],   ", ",Spec.U.high.quant[3,2],   ")"),
+                                                paste0(Spec.U.PMDCV[3],  " (",Spec.U.PMDCV.quant[3,1],  ", ",Spec.U.PMDCV.quant[3,2],  ")")),
+                            "Low.sens.V" = c(paste0(Sens.V.low[3],       " (",Sens.V.low.quant[3,1],    ", ",Sens.V.low.quant[3,2],    ")"),
+                                                paste0(Sens.V.correct[3]," (",Sens.V.correct.quant[3,1],", ",Sens.V.correct.quant[3,2],")"),
+                                                paste0(Sens.V.high[3],   " (",Sens.V.high.quant[3,1],   ", ",Sens.V.high.quant[3,2],   ")"),
+                                                paste0(Sens.V.PMDCV[3],  " (",Sens.V.PMDCV.quant[3,1],  ", ",Sens.V.PMDCV.quant[3,2],  ")")),
+                            "Low.spec.V" = c(paste0(Spec.V.low[3],       " (",Spec.V.low.quant[3,1],    ", ",Spec.V.low.quant[3,2],    ")"),
+                                                paste0(Spec.V.correct[3]," (",Spec.V.correct.quant[3,1],", ",Spec.V.correct.quant[3,2],")"),
+                                                paste0(Spec.V.high[3],   " (",Spec.V.high.quant[3,1],   ", ",Spec.V.high.quant[3,2],   ")"),
+                                                paste0(Spec.V.PMDCV[3],  " (",Spec.V.PMDCV.quant[3,1],  ", ",Spec.V.PMDCV.quant[3,2],  ")"))))
+
+                       
