@@ -150,10 +150,10 @@ MC_10_100_data2$`S-R Median` = MC_10_100_data2$`Select Median` - MC_10_100_data2
 MC_10_100_results2 = data.frame(MC_10_100_data2_diff_mean_avg = mean(MC_10_100_data2$`S-R Mean`),MC_10_100_data2_diff_mean_sd = sqrt(var(MC_10_100_data2$`S-R Mean`)), MC_10_100_data_diff2_median_avg = mean(MC_10_100_data2$`S-R Median`),MC_10_100_data2_diff_median_sd = sqrt(var(MC_10_100_data2$`S-R Median`)))
 MC_10_100_results2
 
-########################################
+##############################################################################
 # Production of Figure 4
 # Note: Necessary to first produce all MC_?_?_data2 and MC_?_?_results2 wanted
-########################################
+##############################################################################
 X = c("10 G, 100 DNAm","15 G, 150 DNAm","25 G, 250 DNAm","50 G, 500 DNAm","100 G, 1000 DNAm")
 Xf = factor(X,levels = c("10 G, 100 DNAm","15 G, 150 DNAm","25 G, 250 DNAm","50 G, 500 DNAm","100 G, 1000 DNAm"))
 Y2 = c(MC_10_100_results2[1]/1000000, MC_15_150_results2[1]/1000000, MC_25_250_results2[1]/1000000, MC_50_500_results2[1]/1000000, MC_100_1000_results2[1]/1000000)
@@ -168,3 +168,49 @@ Mean_diff_data4_plot.1 = ggplot(Mean_diff_data4,aes(x = Type,y = Mbp)) +
   scale_y_continuous(n.breaks = 17)
  
 Mean_diff_data4_plot.1
+
+##############################################################################
+# Production of Figure 5
+# Note: Necessary to first produce all CBS_SVD_R_results_?
+##############################################################################
+
+# Create matrix from previous results
+Sub_mat_6 = t(Corr_chr_1_tran_methyl)[c(CBS_SVD_R_results_1$V.selected[[1]],
+setdiff(CBS_SVD_R_results_2$V.selected[[1]],CBS_SVD_R_results_1$V.selected[[1]]), 
+setdiff(CBS_SVD_R_results_3$V.selected[[1]],CBS_SVD_R_results_2$V.selected[[1]]), 
+setdiff(CBS_SVD_R_results_4$V.selected[[1]],CBS_SVD_R_results_3$V.selected[[1]]), 
+setdiff(CBS_SVD_R_results_5$V.selected[[1]],CBS_SVD_R_results_4$V.selected[[1]])),
+c(CBS_SVD_R_results_1$U.selected[[1]],setdiff(CBS_SVD_R_results_2$U.selected[[1]],
+CBS_SVD_R_results_1$U.selected[[1]]), setdiff(CBS_SVD_R_results_3$U.selected[[1]],
+CBS_SVD_R_results_2$U.selected[[1]]), setdiff(CBS_SVD_R_results_4$U.selected[[1]],
+CBS_SVD_R_results_3$U.selected[[1]]), setdiff(CBS_SVD_R_results_5$U.selected[[1]],
+CBS_SVD_R_results_4$U.selected[[1]]))]
+
+Sub_mat_6_df = as.data.frame(Sub_mat_6)
+Sub_mat_6_df = tibble::rownames_to_column(Sub_mat_6_df, "Gene")
+Sub_mat_6_df_long = Sub_mat_6_df %>% pivot_longer(
+    cols = `cg00261690`:`cg27583604`, 
+    names_to = "Methyl",
+    values_to = "value"
+)
+
+my.lines1 = data.frame(x=c(0,100), y=c(90,100), 
+    xend=c(100,100), yend=c(90,90))
+my.lines2 = data.frame(x=c(0,150), y=c(85,100), 
+    xend=c(150,150), yend=c(85,85))
+my.lines3 = data.frame(x=c(0,250), y=c(75,100), 
+    xend=c(250,250), yend=c(75,75))
+my.lines4 = data.frame(x=c(0,500), y=c(50,100), 
+    xend=c(500,500), yend=c(50,50))
+my.lines5 = data.frame(x=c(0,1000), y=c(0,100), 
+    xend=c(1000,1000), yend=c(0,0))
+
+ggplot(Sub_mat_6_df_long, aes(as.factor(Methyl),as.factor(Gene), group=Gene)) +
+    geom_tile(aes(fill = value)) +
+    scale_fill_gradient2(low="black",high="black",limits=c(-.75,.75)) +
+    labs(x = "Methylations", y = "Genes") + 
+    geom_segment(data=my.lines1, aes(x,y,xend=xend, yend=yend), size=1.5, inherit.aes=F) + 
+    geom_segment(data=my.lines2, aes(x,y,xend=xend, yend=yend), size=1.5, inherit.aes=F) + 
+    geom_segment(data=my.lines3, aes(x,y,xend=xend, yend=yend), size=1.5, inherit.aes=F) + 
+    geom_segment(data=my.lines4, aes(x,y,xend=xend, yend=yend), size=1.5, inherit.aes=F) + 
+    theme(axis.text.x = element_blank(), axis.text.y = element_blank(), axis.ticks.x = element_blank())
