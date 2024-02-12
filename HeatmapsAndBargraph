@@ -173,4 +173,176 @@ grid.arrange(heatmp1.wolegend,
              layout_matrix = rbind(c(1,1,2,3,4,4),
                                    c(1,1,2,3,4,4),
                                    c(5,5,6,6,7,7)))
+###################################
+## Code for Figure 2              #
+###################################
 
+
+#################################################
+## Start with cross-validation
+################################################
+
+optabs = PMD.cv(X,type="standard",nfold=10)$bestsumabs
+pmdcvresult = PMD(X,type="standard",sumabs=optabs)
+
+pmdcv.sparseU = pmdcvresult$u
+pmdcv.sparseV = pmdcvresult$v
+pmdcv.d = pmdcvresult$d
+
+pmdcv.RecombX = pmdcv.d * (pmdcv.sparseU %*% t(pmdcv.sparseV))
+
+###########################################
+# Heatmap with Legend to be extracted     #
+###########################################
+
+pmdcv.Xrecomb.melt = melt(pmdcv.RecombX)
+pmdcv.heatmp1.wlegend2 <- ggplot(pmdcv.Xrecomb.melt,aes(x=Var2,y=rev(Var1),fill=value)) +
+  geom_raster() +
+  scale_x_continuous(expand=c(0,0)) +
+  scale_y_continuous(expand=c(0,0)) +
+  scale_fill_gradient2(low="gray0",mid="white",high="gray0",
+                       limits=c(-5,5),guide = "colourbar") +
+  theme(axis.title=element_blank(),
+        axis.text=element_blank(),
+        axis.ticks=element_blank(),
+        legend.position = "bottom",
+        legend.title = element_blank(),
+        legend.text = element_text(size=12),
+        legend.key.size = unit(1.3,"cm"))
+
+### Extract legend for Figure 2
+legend.pmd <- cowplot::get_legend(pmdcv.heatmp1.wlegend2)
+
+### Create heatmap for Figure 2 without legend
+pmdcv.heatmp1.wolegend2 <- ggplot(pmdcv.Xrecomb.melt,aes(x=Var2,y=rev(Var1),fill=value)) +
+  geom_raster() +
+  scale_x_continuous(expand=c(0,0)) +
+  scale_y_continuous(expand=c(0,0)) +
+  scale_fill_gradient2(low="gray0",mid="white",high="gray0",
+                       limits=c(-5,5)) +
+  theme(axis.title=element_blank(),
+        axis.text=element_blank(),
+        axis.ticks=element_blank(),
+        legend.position = "none",
+        panel.border = element_rect(color="black",fill=NA,linewidth=1),
+        plot.margin = unit(c(.1,-.15,.1,.2),"cm"))
+
+##############################################
+# Create sparse bargraphs for Figure 2       #
+# when using Cross-Validation                #
+##############################################
+sparseU1.df = as.data.frame(pmdcv.sparseU)
+sparseV1.df = as.data.frame(pmdcv.sparseV)
+
+pmdcv.bpU <- ggplot(sparseU1.df,aes(x=as.numeric(rownames(sparseU1.df)),y=pmdcv.sparseU)) +
+  geom_bar(stat="identity",width = 1.0) +
+  coord_flip() +
+  scale_x_reverse(expand=c(0,0)) +
+  scale_y_continuous(breaks=seq(-0.5,0.3,0.05)) +
+  theme_minimal() +
+  theme(axis.title   = element_blank(),
+        axis.text.y  = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.line.x  = element_line(color="black",size=0.5),
+        axis.text.x  = element_text(size=12,color="black"),
+        plot.margin  = unit(c(.2,.2,-.20,.2),"cm"))
+
+pmdcv.bpV <- ggplot(sparseV1.df,aes(x=as.numeric(rownames(sparseV1.df)),y=pmdcv.sparseV)) +
+  geom_bar(stat="identity",width = 1.0) +
+  scale_y_continuous(position="right") +
+  scale_x_continuous(expand = c(0,0)) +
+  theme_minimal() +
+  theme(axis.title   = element_blank(),
+        axis.text.x  = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.line.y  = element_line(color="black",size=0.5),
+        axis.text.y  = element_text(size=12,color="black"),
+        plot.margin  = unit(c(.2,-1.15,.2,.2),"cm"))
+
+
+############################################################################
+# Manual Tuning PMD - This process needs to be repeated until desired      #
+# cardinality is reached.                                                  #
+############################################################################
+
+#Initial run
+pmd1 <- PMD(X,type="standard")
+length(which(pmd1$u != 0))
+length(which(pmd1$v != 0))
+pmd1$sumabsu;pmd1$sumabsv
+##################################################################
+# Modify regularization parameters until cardinality is reached. #
+##################################################################
+pmd1 <- PMD(X,type="standard",sumabsu=4.7,sumabsv = 6)
+length(which(pmd1$u != 0))
+length(which(pmd1$v != 0))
+
+### Get sparse variables and calculate sparse matrix
+pmdman.sparseU = pmd1$u
+pmdman.sparseV = pmd1$v
+pmdman.d = pmd1$d
+
+pmdman.RecombX = pmdman.d * (pmdman.sparseU %*% t(pmdman.sparseV))
+
+### Create heatmap for manual tuning PMD
+pmdman.Xrecomb.melt = melt(pmdman.RecombX)
+pmdman.heatmp1.wolegend2 <- ggplot(pmdman.Xrecomb.melt,aes(x=Var2,y=rev(Var1),fill=value)) +
+  geom_raster() +
+  scale_x_continuous(expand=c(0,0)) +
+  scale_y_continuous(expand=c(0,0)) +
+  scale_fill_gradient2(low="gray0",mid="white",high="gray0",
+                       limits=c(-5,5)) +
+  theme(axis.title=element_blank(),
+        axis.text=element_blank(),
+        axis.ticks=element_blank(),
+        legend.position = "none",
+        panel.border = element_rect(color="black",fill=NA,linewidth=1),
+        plot.margin = unit(c(.1,.2,.1,-.15),"cm"))
+
+### Create barplots for manually tuning
+pmdman.sparseU1.df = as.data.frame(pmdman.sparseU)
+pmdman.sparseV1.df = as.data.frame(pmdman.sparseV)
+
+pmdman.bpU <- ggplot(pmdman.sparseU1.df,aes(x=as.numeric(rownames(pmdman.sparseU1.df)),y=pmdman.sparseU)) +
+  geom_bar(stat="identity",width = 1.0) +
+  coord_flip() +
+  scale_x_reverse(expand=c(0,0)) +
+  scale_y_continuous(breaks=seq(-0.3,0,0.10)) +
+  theme_minimal() +
+  theme(axis.title   = element_blank(),
+        axis.text.y  = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.line.x  = element_line(color="black",size=0.5),
+        axis.text.x  = element_text(size=12,color="black"),
+        plot.margin  = unit(c(.2,.2,-.2,.2),"cm"))
+
+pmdman.bpV <- ggplot(pmdman.sparseV1.df,aes(x=as.numeric(rownames(pmdman.sparseV1.df)),y=pmdman.sparseV)) +
+  geom_bar(stat="identity",width = 1.0) +
+  scale_y_continuous(position="left") +
+  scale_x_continuous(expand = c(0,0)) +
+  theme_minimal() +
+  theme(axis.title   = element_blank(),
+        axis.text.x  = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.line.y  = element_line(color="black",size=0.5),
+        axis.text.y  = element_text(size=12,color="black"),
+        plot.margin  = unit(c(.4,.2,.2,-.9),"cm"))
+
+
+################################################
+## Create Figure 2 for Simulations             #
+################################################
+
+x11()
+grid.arrange(pmdcv.heatmp1.wolegend2,
+             pmdcv.bpU,
+             pmdman.bpU,
+             pmdman.heatmp1.wolegend2,
+             pmdcv.bpV,
+             legend.pmd,
+             pmdman.bpV,
+             nrow=2,
+             ncol=4,
+             layout_matrix = rbind(c(1,1,2,3,4,4),
+                                   c(1,1,2,3,4,4),
+                                   c(5,5,6,6,7,7)))
