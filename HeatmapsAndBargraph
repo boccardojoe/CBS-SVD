@@ -31,20 +31,23 @@ for(i in 1:P)
   }
 }
 
-#Run EM_SVD Rank 1
-emsvd1 = CBS_SVD_R(X,rank=1,ku=c(25),kv=c(40))
+#Run CBS_SVD Rank 1
+cbsvd1 = CBS_SVD_R(X,rank=1,ku=c(25),kv=c(40))
 #Gather appropriate full SVD vectors and sparse SVD vectors
 svdX = svd(X)
 D.r1=svdX$d[1]
 FullU1 = svdX$u[,1]
 FullV1 = svdX$v[,1]
-SparseU = emsvd1$U
-SparseV = emsvd1$V
+SparseU = cbsvd1$U
+SparseV = cbsvd1$V
 RecombX = SparseU %*% D.r1 %*% t(SparseV)
 
-#Start code for Figure 1
+#######################################
+#Start code for Figure 1              #
+#######################################
 
 X.melt = melt(X)
+#This heatmap has the legend which is to be extracted
 heatmp1.wlegend <- ggplot(X.melt,aes(x=Var2,y=rev(Var1),fill=value)) +
   geom_raster() +
   scale_x_continuous(expand=c(0,0)) +
@@ -58,11 +61,13 @@ heatmp1.wlegend <- ggplot(X.melt,aes(x=Var2,y=rev(Var1),fill=value)) +
         legend.key.size = unit(1.3,"cm"),
         legend.text = element_text(size=12),
         legend.title = element_blank())
-heatmp1.wlegend
 
+### Extract the legend
 legend <- cowplot::get_legend(heatmp1.wlegend)
-#legend
 
+###################################################
+#Heatmap for the data matrix X without the legend #
+###################################################
 heatmp1.wolegend <- ggplot(X.melt,aes(x=Var2,y=rev(Var1),fill=value)) +
   geom_raster() +
   scale_x_continuous(expand=c(0,0)) +
@@ -75,12 +80,14 @@ heatmp1.wolegend <- ggplot(X.melt,aes(x=Var2,y=rev(Var1),fill=value)) +
         legend.position = "none",
         panel.border = element_rect(color="black",fill=NA,linewidth=1),
         plot.margin = unit(c(.1,-.15,.1,.2),"cm"))
-heatmp1.wolegend
 
+######################################
+#Full barplots for Figure 1          #
+######################################
 fullU1.df = as.data.frame(FullU1)
 fullV1.df = as.data.frame(FullV1)
 
-bp1 <- ggplot(as.data.frame(fullV1.df),aes(x=as.numeric(rownames(fullV1.df)),y=FullV1)) +
+bpV <- ggplot(as.data.frame(fullV1.df),aes(x=as.numeric(rownames(fullV1.df)),y=FullV1)) +
   geom_bar(stat="identity",width = 1.0) +
   scale_y_continuous(position="right") +
   scale_x_continuous(expand = c(0,0)) +
@@ -92,7 +99,7 @@ bp1 <- ggplot(as.data.frame(fullV1.df),aes(x=as.numeric(rownames(fullV1.df)),y=F
         axis.text.y  = element_text(size=12,color="black"),
         plot.margin = unit(c(.2,-1.15,.2,.2),"cm"))
 
-bp2 <- ggplot(as.data.frame(fullU1.df),aes(x=as.numeric(rownames(fullU1.df)),y=FullU1)) +
+bpU <- ggplot(as.data.frame(fullU1.df),aes(x=as.numeric(rownames(fullU1.df)),y=FullU1)) +
   geom_bar(stat="identity",width = 1.0) +
   coord_flip() +
   scale_x_reverse(expand=c(0,0)) +
@@ -103,3 +110,67 @@ bp2 <- ggplot(as.data.frame(fullU1.df),aes(x=as.numeric(rownames(fullU1.df)),y=F
         axis.line.x  = element_line(color="black",size=0.5),
         axis.text.x  = element_text(size=12,color="black"),
         plot.margin = unit(c(.2,.2,-.20,.2),"cm"))
+########################################################
+#Start Plot for Recombined X after running CBS_SVD     #
+# Get Heatmap for Figure 1                             #
+########################################################
+Xrecomb.melt = melt(RecombX)
+
+heatmp1.wolegendRecomb <- ggplot(Xrecomb.melt,aes(x=Var2,y=rev(Var1),fill=value)) +
+  geom_raster() +
+  scale_x_continuous(expand=c(0,0)) +
+  scale_y_continuous(expand=c(0,0)) +
+  scale_fill_gradient2(low="gray0",mid="white",high="gray0",
+                       limits=c(-5,5)) +
+  theme(axis.title=element_blank(),
+        axis.text=element_blank(),
+        axis.ticks=element_blank(),
+        legend.position = "none",
+        panel.border = element_rect(color="black",fill=NA,linewidth=1),
+        plot.margin = unit(c(.1,.2,.1,-.15),"cm"))
+
+######################################
+#Sparse barplots for Figure 1        #
+######################################
+sparseV1.df = as.data.frame(SparseV1)
+sparseU1.df = as.data.frame(SparseU1)
+
+bpVSparse <- ggplot(as.data.frame(sparseV1.df),aes(x=as.numeric(rownames(sparseV1.df)),y=SparseV1)) +
+  geom_bar(stat="identity",width = 1.0) +
+  scale_y_continuous(position="left") +
+  scale_x_continuous(expand = c(0,0)) +
+  theme_minimal() +
+  theme(axis.title   = element_blank(),
+        axis.text.x  = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.line.y  = element_line(color="black",size=0.5),
+        axis.text.y  = element_text(size=12,color="black"),
+        plot.margin = unit(c(.4,.2,.2,-.9),"cm"))
+
+bpUSparse <- ggplot(as.data.frame(sparseU1.df),aes(x=as.numeric(rownames(sparseU1.df)),y=SparseU1)) +
+  geom_bar(stat="identity",width = 1.0) +
+  coord_flip() +
+  scale_x_reverse(expand=c(0,0)) +
+  theme_minimal() +
+  theme(axis.title   = element_blank(),
+        axis.text.y  = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.line.x  = element_line(color="black",size=0.5),
+        axis.text.x  = element_text(size=12,color="black"),
+        plot.margin = unit(c(.2,.2,-.2,.2),"cm"))
+
+#### Plot everything for Figure 1
+x11()
+grid.arrange(heatmp1.wolegend,
+             bpU,
+             bpUSparse,
+             heatmp1.wolegend2,
+             bpV,
+             legend,
+             bpVSparse,
+             nrow=2,
+             ncol=4,
+             layout_matrix = rbind(c(1,1,2,3,4,4),
+                                   c(1,1,2,3,4,4),
+                                   c(5,5,6,6,7,7)))
+
