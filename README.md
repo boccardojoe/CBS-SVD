@@ -21,6 +21,10 @@ Function outputs:
   3. d : The first singular value.
   4. U.selected : The position values of the non zero elements of vector u. 
   5. V.selected : The position values of the non zero elements of vector v.
+  6. countU : Iterations for convergence of u.
+  7. countV : Iterations for convergence of v.
+  8. kup1 : Final iteration soft threshold value for u.
+  9. kvp1 : Final iteration soft threshold value for v.
 
 ## CBS_SVD_R
 Function outputs:
