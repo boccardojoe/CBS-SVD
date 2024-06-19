@@ -1,7 +1,7 @@
 
-CBS_SVD = function(X,SVDx=svd(X),ku,kv,epsilon=.05) {
+CBS_SVD = function(S,SVDs=svd(S),ku,kv,epsilon=.05) {
   
-  SVD = svd(X)
+  SVD = SVDs
   u1 = SVD$u[,1]
   v1 = SVD$v[,1]
   d1 = SVD$d[1]
@@ -13,14 +13,14 @@ CBS_SVD = function(X,SVDx=svd(X),ku,kv,epsilon=.05) {
     
     countU <- countU+1
     
-    if(ku >= nrow(X))
+    if(ku >= nrow(S))
     {
       u1=u1
-      names(u1) = rownames(X)
+      names(u1) = rownames(S)
       break
     }
     
-    ProjU = X %*% t(X) %*% u1
+    ProjU = S %*% t(S) %*% u1
     
     u1_star = as.vector((ProjU))
     
@@ -48,14 +48,14 @@ CBS_SVD = function(X,SVDx=svd(X),ku,kv,epsilon=.05) {
   repeat {
     
     countV <- countV + 1
-    if(kv >= ncol(X))
+    if(kv >= ncol(S))
     {
       v1=v1
-      names(v1) = colnames(X)
+      names(v1) = colnames(S)
       break
     }
 
-    ProjV = t(X) %*% X %*% v1
+    ProjV = t(S) %*% S %*% v1
     
     v1_star = as.vector((ProjV))
   
