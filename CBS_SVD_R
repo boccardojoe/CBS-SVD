@@ -1,4 +1,4 @@
-CBS_SVD_R <- function(X,rank=1,ku,kv,epsilon=.05)
+CBS_SVD_R <- function(S,rank=1,ku,kv,epsilon=.05)
 {
   #Checks to make sure rank and length of ku and kv are the same
   if(length(ku) != rank)
@@ -13,19 +13,19 @@ CBS_SVD_R <- function(X,rank=1,ku,kv,epsilon=.05)
   }
   
   #Set up matrices and lists
-  U = matrix(NA,nrow=nrow(X),ncol=rank)
-  V = matrix(NA,nrow=ncol(X),ncol=rank)
-  QU = matrix(NA,nrow=nrow(X),ncol=rank)
-  QV = matrix(NA,nrow=ncol(X),ncol=rank)
+  U = matrix(NA,nrow=nrow(S),ncol=rank)
+  V = matrix(NA,nrow=ncol(S),ncol=rank)
+  QU = matrix(NA,nrow=nrow(S),ncol=rank)
+  QV = matrix(NA,nrow=ncol(S),ncol=rank)
   U.selected = list()
   V.selected = list()
   QU.selected = list()
   QV.selected = list()
   #Create identity matrices of size P and Q
-  IU=diag(nrow(X))
-  IV=diag(ncol(X))
-  svdX = svd(X)
-  singularvalues = as.vector(svdX$d[1:rank])
+  IU=diag(nrow(S))
+  IV=diag(ncol(S))
+  svdS = svd(S)
+  singularvalues = as.vector(svdS$d[1:rank])
   
   for(r in 1:rank)
   {
@@ -34,7 +34,7 @@ CBS_SVD_R <- function(X,rank=1,ku,kv,epsilon=.05)
     #and assign them to first column of QU and QV
     if(r == 1)
     {
-      CBSSVD = CBS_SVD(X,svdX,ku=ku[r],kv=kv[r])
+      CBSSVD = CBS_SVD(S,svdS,ku=ku[r],kv=kv[r])
       QU[,r] = CBSSVD$u
       QV[,r] = CBSSVD$v
       U[,r] = CBSSVD$u
@@ -52,27 +52,22 @@ CBS_SVD_R <- function(X,rank=1,ku,kv,epsilon=.05)
     #############################################################################################
     else if(r > 1)
     {
-      XU_proj = t(t(X) %*% (IU - QU[,1:(r-1)] %*% t(QU[,1:(r-1)])))
-      XV_proj = (X %*% (IV - QV[,1:(r-1)] %*% t(QV[,1:(r-1)])))
+      SU_proj = t(t(S) %*% (IU - QU[,1:(r-1)] %*% t(QU[,1:(r-1)])))
+      SV_proj = (S %*% (IV - QV[,1:(r-1)] %*% t(QV[,1:(r-1)])))
       
-      #X_proj = X - QU[,1:(r-1)] %*% t(QV[,1:(r-1)])
-      
-      CBSSVDU = CBS_SVD(XU_proj,svd(XU_proj),ku=ku[r],kv=kv[r])
+      CBSSVDU = CBS_SVD(SU_proj,svd(SU_proj),ku=ku[r],kv=kv[r])
       u = CBSSVDU$u
       U[,r] = u
       U.selected[[r]] = CBSSVDU$U.selected
       QU_next = (IU - QU[,1:(r-1)] %*% t(QU[,1:(r-1)])) %*% u
       QU[,r] = QU_next/norm(QU_next,type="2")
       
-      CBSSVDV = CBS_SVD(XV_proj,svd(XV_proj),ku=ku[r],kv=kv[r])
+      CBSSVDV = CBS_SVD(SV_proj,svd(SV_proj),ku=ku[r],kv=kv[r])
       v = CBSSVDV$v
       V[,r] = v
       V.selected[[r]] = CBSSVDV$V.selected
       QV_next = (IV - QV[,1:(r-1)] %*% t(QV[,1:(r-1)])) %*% v
       QV[,r] = QV_next/norm(QV_next,type="2")
-      
-
-
     }
   }
   #############################################
