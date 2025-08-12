@@ -1,0 +1,64 @@
+#' Create M Matrix
+#'
+#' Inputs two omics type data sets and output data set to create a
+#' correlation matrix which matches the following causal model: \eqn{G \rightarrow X \rightarrow Y}
+#'
+#' Calculates: \eqn{\mathbf{M} = [m_ij] = cov(Y,X^*_i)cov(X_i,G_j)cov(Y,G_j)}
+#' where \eqn{X^*_i} are the residuals from the regression of \eqn{X_i} on all of \eqn{G}.
+#'
+#' Defaults to using 2 principal components of \eqn{G} in the regression.
+#'
+#' @importFrom pls pcr
+#'
+#' @param X \eqn{N \times P} data matrix of a set of \eqn{P} variables measured on the same set of \eqn{N} subject as \eqn{G} and \eqn{Y}
+#' @param G \eqn{N \times Q} data matrix of a set of \eqn{Q} variables measured on the same set of \eqn{N} subject as \eqn{X} and \eqn{Y}
+#' @param Y \eqn{N \times 1} vector for the continuous outcome variable measured on the same set of \eqn{N} subject as \eqn{X} and \eqn{Y}
+#' @param scaleXG If true, scale the columns in \code{X} and \code{G} to have variance 1. Default is \code{T}.
+#' @param scaleY If true, column scale the outcome vector to have variance 1, Default is \code{T}.
+#' @param numcomp Number of principal components to use in the regression of \eqn{X_i \sim G}. Default is 2. Set to 0 to use multiple linear regression.
+#'
+#' @return \eqn{P \times Q} M Matrix
+#' @export
+
+Create_M <- function(X,G,Y,scaleXG=T,scaleY=F,scaleXResid=T,scaleYResid=T,numcomp=2,includenegs=F)
+{
+
+  if(scaleXG == T)
+  {
+    X = apply(X,2,scalecolumn)
+    G = apply(G,2,scalecolumn)
+  }
+  if(scaleY == T)
+  {
+    Y = scalecolumn(Y)
+  }
+
+  if(numcomp > 0)
+  {
+    pcrX.G = pcr(X ~ G,ncomp=numcomp,scale=T,center=T)
+    resX.G = residuals(pcrX.G)[,,numcomp]
+    if(scaleXResid==T){resX.G=apply(resX.G,2,scalecolumn)}
+    pcrY.G = pcr(Y ~ G,ncomp=numcomp,scale=T,center=T)
+    resY.G = residuals(pcrY.G)[,,numcomp]
+    if(scaleYResid==T){resY.G=scalecolumn(resY.G)}
+  }
+  else if(numcomp == 0)
+  {
+    resX.G = residuals(lm(X ~ G))
+  }
+
+  CovY.Xstar = c()
+  for(i in 1:ncol(resX.G))
+  {
+    CovY.Xstar[i] = lm(resY.G ~ resX.G[,i])$coefficients[2]*var(resX.G[,i])
+  }
+
+  M = (as.vector(CovY.Xstar) %o% as.vector(cov(Y,G))) * cov(X,G)
+
+  if(includenegs == F)
+  {
+    M = pmax(M,0)
+  }
+
+  return(M)
+}
