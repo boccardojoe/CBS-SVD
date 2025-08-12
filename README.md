@@ -40,3 +40,17 @@ Function outputs:
   8. V.selected : The position values of the non zero elements for each column of the matrix V.
   9. U.check : Matrix of inner products between all columns of matrix U.
   10. V.check : Matrix of inner products between all columns of matrix V.
+
+## Cardinality-Based Path Tuning Algorithm
+Function inputs:
+  1. **S** : The similarity matrix created from the two datasets.
+  2. u_1 and v_1:  First left and right singular vectors.
+  3. mindiag: Start cardinalities for the diagonal search.
+  4. maxrow, maxcol: Maximum row and column cardinality to search until.
+  5. restartrow, restartcol: T/F indicating whether to restart the column and row cardinalities after the diagonal search. Default is T.
+  6. alpha/beta: Tuning parameters for the numerator of the SCNORM function.
+  7. lambda: Tuning parameter for the denominator of the SCNORM function.
+
+Function outputs:
+  1. Row.SN.Max: Optimal row cardinality determined by the algorithm.
+  2. Column.SN.Max:  Optimal column cardinality determined by the algorithm.
