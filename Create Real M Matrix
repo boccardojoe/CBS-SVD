@@ -1,0 +1,190 @@
+#Get methylations for chromosome
+library(SummarizedExperiment) # CRUCIAL for SummarizedExperiment objects
+library(minfi)                # CRUCIAL if GDCprepare is expected to return GenomicRatioSet
+library(GenomicRanges)        # For GRanges manipulation
+library(AnnotationHub)        # For CpG island annotations
+library(ggplot2)
+library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
+library(minfi)
+library(matrixStats)  # For efficient row operations
+library(dplyr)
+
+setwd("C:\\Users\\jboccard\\Box\\bNSM\\RealData\\Examples")
+
+cat("loading clinical_UCEC.Rdata","\n")
+load("./clinical_UCEC.Rdata")
+
+cat("loading dnamethy_UCEC.Rdata","\n")
+load("./dnamethy_UCEC.Rdata")
+
+cat("loading transcripts_UCEC.Rdata","\n")
+load("./transcripts_UCEC.Rdata")
+
+###############################################################
+# Get Y and get subjects
+##############################################################
+
+methy.measure <- assay(methy.UCEC.sumy)
+
+methy.compound.info <- rowRanges(methy.UCEC.sumy)
+
+methy.patient.info <- colData(methy.UCEC.sumy)
+
+trans.compound.info <- as.data.frame(trans.compound.info)
+
+methy.patient.7bcode <- rownames(methy.patient.info)[methy.patient.info$definition == "Primary solid Tumor"]
+names(methy.patient.7bcode) <- methy.patient.info$patient[methy.patient.info$definition == "Primary solid Tumor"]
+
+
+
+trans.patient.7bcode <- rownames(trans.patient.info)[trans.patient.info$definition == "Primary solid Tumor"]
+names(trans.patient.7bcode) <- trans.patient.info$patient[trans.patient.info$definition == "Primary solid Tumor"]
+
+
+clinical.patients <- ucec.clinical$bcr_patient_barcode[ucec.clinical$histological_type == "Endometrioid endometrial adenocarcinoma"]
+
+patients.Y.unmissing <- ucec.clinical$bcr_patient_barcode[!is.na(ucec.clinical$pct_tumor_invasion)]
+
+
+selected.patients <- intersect(intersect(names(methy.patient.7bcode),
+                                         names(trans.patient.7bcode)),
+                               intersect(clinical.patients, patients.Y.unmissing))
+
+
+selected.methy.pt.7code <- methy.patient.7bcode[selected.patients]
+
+
+selected.trans.pt.7code <- trans.patient.7bcode[selected.patients]
+
+
+
+cat("generating y","\n")
+y <- ucec.clinical$pct_tumor_invasion[ucec.clinical$bcr_patient_barcode %in% selected.patients]
+names(y) <- ucec.clinical$bcr_patient_barcode[ucec.clinical$bcr_patient_barcode %in% selected.patients]
+y <- y[selected.patients]
+
+Y.outlier = which(y > 100)
+y <- y[-Y.outlier]
+
+##############################################################################################################
+# Begin creation of G. Subset to chromosome, group by region type and if open sea, group to within 1000 bp
+##############################################################################################################
+
+# Load full annotation
+ann450k <- getAnnotation(IlluminaHumanMethylation450kanno.ilmn12.hg19)
+probe.meta <- as.data.frame(ann450k)
+
+# Subset to probes in your methylation matrix
+common.probes <- intersect(rownames(methy.measure), rownames(probe.meta))
+
+# Match metadata for the methylation probes
+methy.meta <- probe.meta[common.probes, ]
+keep <- complete.cases(methy.meta[, c("chr", "pos", "Islands_Name", "Relation_to_Island")])
+methy.meta.clean <- methy.meta[keep, ]
+island.gr <- GRanges(
+  seqnames = methy.meta.clean$chr,
+  ranges = IRanges(start = methy.meta.clean$pos, width = 1),
+  island = methy.meta.clean$Islands_Name,
+  relation = methy.meta.clean$Relation_to_Island
+)
+
+# Now subset only chromosome 10
+chr10.probes <- probe.meta$chr == "chr10"
+
+# Subset only chr10 from methy.meta.clean
+meta.chr10 <- methy.meta.clean[methy.meta.clean$chr == "chr10", ]
+
+# Subset methylation data using probe names from chr10 metadata
+methy.chr10 <- methy.measure[rownames(meta.chr10), ]
+
+dim(methy.chr10)
+
+# Group label: CpG island name if present, else relation (shore/shelf/open sea)
+meta.chr10$CpG_group <- ifelse(
+  meta.chr10$Islands_Name != "",
+  meta.chr10$Islands_Name,
+  meta.chr10$Relation_to_Island
+)
+
+# Only open sea probes
+open_sea_idx <- meta.chr10$Relation_to_Island == "OpenSea"
+open_sea_gr <- GRanges(
+  seqnames = meta.chr10$chr[open_sea_idx],
+  ranges = IRanges(start = meta.chr10$pos[open_sea_idx], width = 1),
+  probe = rownames(meta.chr10)[open_sea_idx]
+)
+
+# Cluster nearby open sea probes within 1kb
+open_sea_clusters <- GenomicRanges::reduce(open_sea_gr, min.gapwidth = 1000)
+
+# Label open sea clusters by genomic range
+open_sea_labels <- paste0(seqnames(open_sea_clusters), ":", start(open_sea_clusters), "-", end(open_sea_clusters))
+mcols(open_sea_clusters)$label <- open_sea_labels
+
+# Map each probe to a cluster
+hits <- findOverlaps(open_sea_gr, open_sea_clusters)
+probe_to_cluster <- open_sea_labels[subjectHits(hits)]
+names(probe_to_cluster) <- mcols(open_sea_gr)$probe[queryHits(hits)]
+
+# Overwrite CpG group labels with open sea cluster labels
+meta.chr10[names(probe_to_cluster), "CpG_group"] <- probe_to_cluster
+
+# Now group all chr10 probes by CpG_group (islands, shores, shelves, or open sea clusters)
+group_to_probes <- split(rownames(meta.chr10), meta.chr10$CpG_group)
+
+# Extract the unique CpG_group labels
+groups <- unique(meta.chr10$CpG_group)
+
+# For each group, get the region label (Relation_to_Island) of the first probe in that group
+region_labels <- sapply(groups, function(g) {
+  probes_in_group <- rownames(meta.chr10)[meta.chr10$CpG_group == g]
+  # Take the first probe's relation
+  meta.chr10[probes_in_group[1], "Relation_to_Island"]
+})
+
+# Create new combined group names: "group_region"
+combined_group_names <- paste0(groups, "_", region_labels)
+
+# Rename the groups in group_to_probes
+names(group_to_probes) <- combined_group_names
+
+# Mean methylation per group (patients x groups)
+G_chr10 <- sapply(group_to_probes, function(idxs) {
+  colMeans(methy.chr10[idxs, , drop = FALSE], na.rm = TRUE)
+})
+
+# Transpose so each row is a sample
+G_chr10.OSRegGrp <- t(G_chr10)
+dim(G_chr10.OSRegGrp)
+
+
+# Modify G to selected patients then transform to M value
+
+G_chr10.OSRegGrp.final <- as.data.frame(t(G_chr10.OSRegGrp)[selected.methy.pt.7code,])
+dim(G_chr10.OSRegGrp.final)
+
+G_chr10.OSRegGrp.final <- log2(G_chr10.OSRegGrp.final/(1 - G_chr10.OSRegGrp.final)) # transfer to M value from beta value
+
+
+G_chr10.OSRegGrp.final <- G_chr10.OSRegGrp.final[,sapply(X = seq(1,ncol(G_chr10.OSRegGrp.final)),FUN = function(col){all(!is.na(G_chr10.OSRegGrp.final[,col]))})]
+
+G_chr10.OSRegGrp.final <- G_chr10.OSRegGrp.final[,sapply(X = seq(1,ncol(G_chr10.OSRegGrp.final)),FUN = function(col){!all(G_chr10.OSRegGrp.final[,col] == 0)})]
+G_chr10.OSRegGrp.final <- G_chr10.OSRegGrp.final[-Y.outlier,]
+
+dim(G_chr10.OSRegGrp.final)
+
+cat("generating X","\n")
+
+# Get the transcripts for chromosome 10
+
+selected.trans.ensembles <- trans.compound.info$gene_id[trans.compound.info$seqnames == "chr10"]
+
+X.chr10 <- t(trans.measure[selected.trans.ensembles, selected.trans.pt.7code])
+
+X.chr10  <- X.chr10[,sapply(X = seq(1,ncol(X.chr10)),FUN = function(col){all(!is.na(X.chr10[,col]))})]
+
+X.chr10  <- X.chr10[,sapply(X = seq(1,ncol(X.chr10)),FUN = function(col){!all(X.chr10[,col] == 0)})]
+
+X.chr10 <- X.chr10[-Y.outlier,]
+
+dim(X.chr10)
