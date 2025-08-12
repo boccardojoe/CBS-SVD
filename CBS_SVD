@@ -1,94 +1,123 @@
+#' Cardinality-Based Sparse Singular Value Decomposition CBS-SVD (Rank 1)
+#'
+#' @param X Input data matrix of size P x Q.
+#' @param initialu Input vector for the initial left singular vector \code{u1}. Default is first left singular vector.
+#' @param initialv Input vector for the initial right singular vector \code{v1}. Default is first right singular vector.
+#' @param ku Input cardinality corresponding to the P rows of \code{X}.
+#' @param kv Input cardinality corresponding to the Q columns of \code{X}.
+#' @param epsilon Convergence threshold to stop the algorithm. Default is 0.05.
+#'
+#' @return A list with the following components:
+#' \describe{
+#'   \item{u}{The final sparse first left singular vector with \code{ku} cardinality.}
+#'   \item{v}{The final sparse first right singular vector with \code{kv} cardinality.}
+#'   \item{U.selected}{Indices corresponding to the nonzero elements of \code{u}.}
+#'   \item{V.selected}{Indices corresponding to the nonzero elements of \code{v}.}
+#'   \item{U.selected.Names}{Row variable names of \code{X} corresponding to \code{U.selected}.}
+#'   \item{V.selected.Names}{Column variable names of \code{X} corresponding to \code{V.selected}.}
+#'   \item{countU}{Number of iterations needed for convergence of \code{u}.}
+#'   \item{countV}{Number of iterations needed for convergence of \code{v}.}
+#'   \item{ku}{Cardinality constraint used for \code{u}.}
+#'   \item{kv}{Cardinality constraint used for \code{v}.}
+#' }
+#' @export
 
-CBS_SVD = function(S,SVDs=svd(S),ku,kv,epsilon=.05) {
-  
-  SVD = SVDs
-  u1 = SVD$u[,1]
-  v1 = SVD$v[,1]
-  d1 = SVD$d[1]
-  
+CBSSVD_Base <- function(X,initialu=NULL,initialv=NULL,ku,kv,epsilon=.05){
+
+  if (is.null(initialu)) initialu <- svd(X)$u[,1]
+  if (is.null(initialv)) initialv <- svd(X)$v[,1]
+
+  u1=initialu
+  v1=initialv
+
   countU <- 0
   countV <- 0
-  
+
   repeat {
-    
+
     countU <- countU+1
-    
-    if(ku >= nrow(S))
+
+    if(ku >= nrow(X))
     {
       u1=u1
-      names(u1) = rownames(S)
+      if (!is.null(rownames(X))) names(u1) = rownames(X)
       break
     }
-    
-    ProjU = S %*% t(S) %*% u1
-    
-    u1_star = as.vector((ProjU))
-    
+
+    yp = t(X) %*% u1
+
+    fp = X %*% yp
+    sumsqryp = as.numeric((t(yp) %*% yp))
+    u1_star = as.vector(fp)/(norm(yp,type="2"))
+
     sp = sort(abs(u1_star), decreasing = TRUE)
     pip_ = order(abs(u1_star), decreasing = TRUE)
-    u1_tp1 = integer(length = nrow(X))
-    
-    u1_tp1[1:ku] = u1_tp1[1:ku] + sp[1:ku] - sp[ku+1]
-    kup1 = sp[ku+1] 
-    
+    u1_tp1 = numeric(length = nrow(X))
+
+    for (i in 1:ku) {
+      u1_tp1[1:i] = u1_tp1[1:i] + (sp[i]-sp[i+1])
+    }
+
     u1_tp1 = u1_tp1[order(pip_)]
-    
+
     u1_tp1 = u1_tp1*sign(u1_star)/norm(u1_tp1, type = "2")
-    
+
     converge_p = abs(t(u1_tp1) %*% u1)
-    
+
     if (converge_p>(1-epsilon)) {
       u1 = u1_tp1
-      names(u1) = rownames(X)
+      if (!is.null(rownames(X))) names(u1) = rownames(X)
       break
     }
     u1 = u1_tp1
   }
-  
+
   repeat {
-    
+
     countV <- countV + 1
-    if(kv >= ncol(S))
+    if(kv >= ncol(X))
     {
       v1=v1
-      names(v1) = colnames(S)
+      if (!is.null(colnames(X))) names(v1) = colnames(X)
       break
     }
 
-    ProjV = t(S) %*% S %*% v1
-    
-    v1_star = as.vector((ProjV))
-  
+    yq = X %*% v1
+
+    fq = t(X) %*% yq
+    sumsqryq = (t(yq) %*% yq)
+    v1_star = as.vector(fq)/(norm(yq,type="2"))
+
     sq= sort(abs(v1_star), decreasing = TRUE)
     piq_ = order(abs(v1_star), decreasing = TRUE)
-    v1_tp1 = integer(length = ncol(X))
-    
-    v1_tp1[1:kv] = v1_tp1[1:kv] + sq[1:kv]-sq[kv+1]
-    kvp1 = sq[kv+1]
-    
+    v1_tp1 = numeric(length = ncol(X))
+
+    for (j in 1:kv) {
+      v1_tp1[1:j] = v1_tp1[1:j] + (sq[j]-sq[j+1])
+    }
+
     v1_tp1 = v1_tp1[order(piq_)]
-    
+
     v1_tp1 = v1_tp1*sign(v1_star)/norm(v1_tp1, type = "2")
-    
+
     converge_q = abs(t(v1_tp1) %*% v1)
-    
+
     if (converge_q>(1-epsilon)) {
       v1 = v1_tp1
-      names(v1) = colnames(X)
+      if (!is.null(colnames(X))) names(v1) = colnames(X)
       break
     }
     v1 = v1_tp1
   }
-  
-  return(list(u = u1, 
-              v = v1, 
-              d = d1, 
-              U.selected = which(u1 != 0), 
+
+  return(list(u = u1,
+              v = v1,
+              U.selected = which(u1 != 0),
               V.selected = which(v1 != 0),
+              U.selected.Names = rownames(X[which(u1 != 0),]),
+              V.selected.Names = colnames(X[,which(v1 != 0)]),
               countU=countU,
               countV=countV,
-              kup1=kup1,
-              kvp1=kvp1,
               ku=ku,
               kv=kv))
 }
