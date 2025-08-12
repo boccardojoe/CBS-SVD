@@ -1,0 +1,269 @@
+library(org.Hs.eg.db)
+library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+library(AnnotationDbi)
+# Circle plot for lambda 1.5
+# Your Ensembl IDs
+ensembl_ids.1.5 <- sub("\\..*", "", names(sort(abs(CBSSVD.OSRegGrp.chr10.1.5$u[CBSSVD.OSRegGrp.chr10.1.5$u != 0]), decreasing = TRUE)))
+
+# Map Ensembl → Entrez ID
+entrez_ids <- mapIds(org.Hs.eg.db,
+                     keys = ensembl_ids.1.5,
+                     column = "ENTREZID",
+                     keytype = "ENSEMBL",
+                     multiVals = "first")
+
+# Map Ensembl → SYMBOL
+gene_symbols <- mapIds(org.Hs.eg.db,
+                       keys = ensembl_ids.1.5,
+                       column = "SYMBOL",
+                       keytype = "ENSEMBL",
+                       multiVals = "first")
+# Get gene coordinates from TxDb
+gene_coords <- genes(TxDb.Hsapiens.UCSC.hg19.knownGene)
+
+# Subset to matched Entrez IDs
+gene_coords_subset <- gene_coords[names(gene_coords) %in% entrez_ids]
+
+# Create a metadata dataframe
+meta_info <- data.frame(
+  ensembl_gene_id = names(entrez_ids),
+  entrez_id = unname(entrez_ids),
+  external_gene_name = unname(gene_symbols),
+  stringsAsFactors = FALSE
+)
+
+# Merge metadata with coordinates
+# Convert gene_coords_subset to data.frame
+gene_coords_df <- as.data.frame(gene_coords_subset)
+gene_coords_df$entrez_id <- rownames(gene_coords_df)
+
+# Merge gene coordinates with symbols
+meta_info.1.5 <- merge(meta_info, gene_coords_df, by = "entrez_id")
+
+library(tibble)
+library(dplyr)
+library(tidyr)
+
+meth_df.1.5 <- tibble(region = CBSSVD.OSRegGrp.chr10.1.5$V.selected.Names) %>%
+  separate(region, into = c("chr", "range_extra"), sep = ":", remove = FALSE) %>%
+  separate(range_extra, into = c("range", "context"), sep = "_", fill = "right") %>%
+  separate(range, into = c("start", "end"), sep = "-") %>%
+  mutate(
+    start = as.numeric(start),
+    end = as.numeric(end)
+  )
+
+
+library(GenomicRanges)
+
+# Convert to GRanges
+
+genes_gr.1.5 <- GRanges(seqnames = "chr10",
+                        ranges = IRanges(start = meta_info.1.5$start,
+                                         end = meta_info.1.5$end),
+                        gene =  meta_info.1.5$ensembl_gene_id)
+
+meth_gr.1.5 <- GRanges(seqnames = meth_df.1.5$chr,
+                       ranges = IRanges(start = meth_df.1.5$start, end = meth_df.1.5$end),
+                       id = CBSSVD.OSRegGrp.chr10.1.5$V.selected.Names)
+
+#meth_level <- colMeans(G.sumo.OSRegGrp[,CBSSVD.OSRegGrp.chr10$V.selected], na.rm = TRUE)
+#mcols(meth_gr)$meth_level <- meth_level[mcols(meth_gr)$id]
+# Find overlaps within 500kb
+hits.1.5 <- findOverlaps(meth_gr.1.5, genes_gr.1.5, maxgap = 5e8)
+
+# Build link dataframe
+link_df.1.5 <- data.frame(
+  chr1 = as.character(seqnames(meth_gr.1.5[queryHits(hits.1.5)])),
+  start1 = start(meth_gr.1.5[queryHits(hits.1.5)]),
+  end1 = end(meth_gr.1.5[queryHits(hits.1.5)]),
+  meth_id = mcols(meth_gr.1.5[queryHits(hits.1.5)])$id,
+  chr2 = as.character(seqnames(genes_gr.1.5[subjectHits(hits.1.5)])),
+  start2 = start(genes_gr.1.5[subjectHits(hits.1.5)]),
+  end2 = end(genes_gr.1.5[subjectHits(hits.1.5)]),
+  gene = mcols(genes_gr.1.5[subjectHits(hits.1.5)])$gene
+)
+link_df.1.5$dummy <- 1
+link_df.1.5$correlation <- mapply(function(g,m) M.pcr1.cor.OSRegGrp.chr10[g,m], link_df.1.5$gene,link_df.1.5$meth_id)
+
+
+df_meth.1.5 <- data.frame(
+  chr = link_df.1.5$chr1,
+  start = link_df.1.5$start1,
+  end = link_df.1.5$end1
+)
+df_corr.1.5 <- data.frame(
+  chr = link_df.1.5$chr2,
+  start = link_df.1.5$start2,
+  end = link_df.1.5$end2,
+  correlation = link_df.1.5$correlation
+)
+
+
+#####################################################################
+# Circle Plot
+####################################################################
+CBSSVD.OSRegGrp.chr10.2.0=CBSSVD.OSRegGrp.chr10.2.0.1
+M.pcr1.cor.OSRegGrp.chr10=M.pcr1.cor.OSRegGrp.chr10.1
+library(org.Hs.eg.db)
+library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+library(AnnotationDbi)
+# Circle plot for lambda 2.0
+# Your Ensembl IDs
+ensembl_ids.2.0 <- sub("\\..*", "", names(sort(abs(CBSSVD.OSRegGrp.chr10.2.0$u[CBSSVD.OSRegGrp.chr10.2.0$u != 0]), decreasing = TRUE)))
+
+# Map Ensembl → Entrez ID
+entrez_ids <- mapIds(org.Hs.eg.db,
+                     keys = ensembl_ids.2.0,
+                     column = "ENTREZID",
+                     keytype = "ENSEMBL",
+                     multiVals = "first")
+
+# Map Ensembl → SYMBOL
+gene_symbols <- mapIds(org.Hs.eg.db,
+                       keys = ensembl_ids.2.0,
+                       column = "SYMBOL",
+                       keytype = "ENSEMBL",
+                       multiVals = "first")
+# Get gene coordinates from TxDb
+gene_coords <- genes(TxDb.Hsapiens.UCSC.hg19.knownGene)
+
+# Subset to matched Entrez IDs
+gene_coords_subset <- gene_coords[names(gene_coords) %in% unname(entrez_ids)]
+gene_coords_chr10 <- gene_coords_subset[seqnames(gene_coords_subset) == "chr10"]
+# Create a metadata dataframe
+meta_info <- data.frame(
+  ensembl_gene_id = names(entrez_ids),
+  entrez_id = unname(entrez_ids),
+  external_gene_name = unname(gene_symbols),
+  stringsAsFactors = FALSE
+)
+
+# Merge metadata with coordinates
+# Convert gene_coords_subset to data.frame
+gene_coords_df <- as.data.frame(gene_coords_chr10)
+gene_coords_df$entrez_id <- rownames(gene_coords_df)
+
+# Merge gene coordinates with symbols
+meta_info.2.0 <- gene_coords_df %>%
+  left_join(meta_info, by = "entrez_id")
+library(tibble)
+library(dplyr)
+library(tidyr)
+
+meth_df.2.0 <- tibble(region = CBSSVD.OSRegGrp.chr10.2.0$V.selected.Names) %>%
+  separate(region, into = c("chr", "range_extra"), sep = ":", remove = FALSE) %>%
+  separate(range_extra, into = c("range", "context"), sep = "_", fill = "right") %>%
+  separate(range, into = c("start", "end"), sep = "-") %>%
+  mutate(
+    start = as.numeric(start),
+    end = as.numeric(end)
+  )
+
+
+library(GenomicRanges)
+
+# Convert to GRanges
+
+genes_gr.2.0 <- GRanges(seqnames = "chr10",
+                    ranges = IRanges(start = meta_info.2.0$start,
+                                     end = meta_info.2.0$end),
+                    gene =  meta_info.2.0$ensembl_gene_id)
+
+meth_gr.2.0 <- GRanges(seqnames = meth_df.2.0$chr,
+                   ranges = IRanges(start = meth_df.2.0$start, end = meth_df.2.0$end),
+                   id = CBSSVD.OSRegGrp.chr10.2.0$V.selected.Names)
+
+#meth_level <- colMeans(G.sumo.OSRegGrp[,CBSSVD.OSRegGrp.chr10$V.selected], na.rm = TRUE)
+#mcols(meth_gr)$meth_level <- meth_level[mcols(meth_gr)$id]
+# Find overlaps within 500kb
+hits.2.0 <- findOverlaps(meth_gr.2.0, genes_gr.2.0, maxgap = 5e8)
+
+# Build link dataframe
+link_df.2.0 <- data.frame(
+  chr1 = as.character(seqnames(meth_gr.2.0[queryHits(hits.2.0)])),
+  start1 = start(meth_gr.2.0[queryHits(hits.2.0)]),
+  end1 = end(meth_gr.2.0[queryHits(hits.2.0)]),
+  meth_id = mcols(meth_gr.2.0[queryHits(hits.2.0)])$id,
+  chr2 = as.character(seqnames(genes_gr.2.0[subjectHits(hits.2.0)])),
+  start2 = start(genes_gr.2.0[subjectHits(hits.2.0)]),
+  end2 = end(genes_gr.2.0[subjectHits(hits.2.0)]),
+  gene = mcols(genes_gr.2.0[subjectHits(hits.2.0)])$gene
+)
+link_df.2.0$dummy <- 1
+link_df.2.0$correlation <- mapply(function(g,m) M.pcr1.cor.OSRegGrp.chr10[g,m], link_df.2.0$gene,link_df.2.0$meth_id)
+
+
+df_meth.2.0 <- data.frame(
+  chr = link_df.2.0$chr1,
+  start = link_df.2.0$start1,
+  end = link_df.2.0$end1
+)
+df_corr.2.0 <- data.frame(
+  chr = link_df.2.0$chr2,
+  start = link_df.2.0$start2,
+  end = link_df.2.0$end2,
+  correlation = link_df.2.0$correlation
+)
+summary(link_df.2.0$correlation)
+
+library(circlize)
+library(ComplexHeatmap)
+circos.clear()
+
+# Initialize chromosome ideogram
+col_fun <- colorRamp2(
+  c(-0.020, 0, 0.020),  # match the observed min and max
+  c("black", "white", "blue"),
+  transparency = 0        # ensure fully opaque colors
+)
+
+link_df.2.0$link_col <- col_fun(link_df.2.0$correlation)
+par(mar = c(4, 4, 6, 4), cex = 1.35)  # Increase top margin
+circos.par(
+  canvas.xlim     = c(-0.95, 0.95),   # zoom in the circle
+  canvas.ylim     = c(-0.95, 0.95),
+  track.margin    = c(0.002, 0.002),  # tighter tracks
+  cell.padding    = c(0, 0, 0, 0),
+  start.degree    = 90
+)
+
+circos.initializeWithIdeogram(species = "hg19",chromosome.index="chr10",track.height = 0.04,plotType = c("ideogram", "axis", "labels"))  # or "hg38"
+
+
+circos.genomicTrack(
+  df_meth.2.0,
+  ylim = c(0, 1),
+  panel.fun = function(region, value, ...) {
+    circos.genomicRect(region, value, col = "green", border = "darkgreen", ...)
+  },
+  track.height = 0.07,
+  bg.border = NA
+)
+
+circos.genomicTrack(
+  df_corr.2.0,
+  ylim = c(0, 1),
+  panel.fun = function(region, value, ...) {
+    circos.genomicRect(region, value, col = "skyblue", border = "black", ...)
+  },
+  track.height = 0.10,
+  bg.border = NA
+)
+
+#Draw stronger links later
+ordering <- order(abs(link_df.2.0$correlation))
+circos.genomicLink(df_meth.2.0[ordering, ], df_corr.2.0[ordering, ], col = link_df.2.0$link_col[ordering])
+
+title("Methylation ↔ Gene Links (Selected) \n Lambda=2.0, Cardinality Row=173, Column=697")
+
+lgd1 <- Legend(labels = c("Methylation", "Gene"),
+               type = "points",
+               pch = 15,
+               legend_gp = gpar(col = c("green", "skyblue"),border=c("darkgreen","black")))
+
+lgd2 <- Legend(at = c(-0.020, 0, 0.020),
+               col_fun = col_fun,
+               title = "M-Matrix Value")
+
+draw(packLegend(lgd1, lgd2), x = unit(1, "npc") - unit(1, "mm"), just = "right")
