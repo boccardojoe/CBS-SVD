@@ -1,40 +1,69 @@
-CBS_SVD_R <- function(S,rank=1,ku,kv,epsilon=.05)
+
+
+#' Cardinality-Based Sparse Singular Value Decomposition CBS_SVD (Rank R)
+#'
+#' @param X Input data matrix of size P x Q
+#' @param rank Number of left and right singular vectors to estimate. Default is 1.
+#' @param KU Vector of cardinality inputs for each left singular vector being estimated. The length of \code{KU} should be equal to inputted rank.
+#' @param KV Vector of cardinality inputs for each right singular vector being estimated. The length of \code{KV} should be equal to inputted rank.
+#' @param epsilon Convergence threshold to stop the algorithm. Default is 0.05.
+#'
+#' @return A list with the following components:
+#' \describe{
+#'   \item{rank}{The inputted rank of the SVD desired.}
+#'   \item{epsilon}{The convergence threshold used in the algorithm.}
+#'   \item{D}{Vector containing the singular values, of length equal to \code{rank}.}
+#'   \item{KU}{Input vector of cardinality parameters for the left singular vectors.}
+#'   \item{KV}{Input vector of cardinality parameters for the right singular vectors.}
+#'   \item{U}{A matrix of size P \eqn{\times} \code{rank} containing the left sparse singular vectors.}
+#'   \item{V}{A matrix of size Q \eqn{\times} \code{rank} containing the right sparse singular vectors.}
+#'   \item{U.selected}{List of indices for the non-zero elements of each left singular vector.}
+#'   \item{V.selected}{List of indices for the non-zero elements of each right singular vector.}
+#'   \item{U.check}{Matrix \code{t(U) \%*\% U} to assess orthogonality of the left vectors.}
+#'   \item{V.check}{Matrix \code{t(V) \%*\% V} to assess orthogonality of the right vectors.}
+#' }
+
+
+CBS_SVD_R <- function(X,rank=1,KU,KV,epsilon=.05)
 {
-  #Checks to make sure rank and length of ku and kv are the same
-  if(length(ku) != rank)
+  #Checks to make sure rank and length of KU and KV are the same
+  if(length(KU) != rank)
   {
-    print("Mismatch between desired ranku and number of input parameters for U")
+    print("Mismatch between desired rank and number of input parameters for U")
     break
   }
-  if(length(kv) != rank)
+  if(length(KV) != rank)
   {
-    print("Mismatch between desired ranku and number of input parameters for V")
+    print("Mismatch between desired rank and number of input parameters for V")
     break
   }
-  
+
   #Set up matrices and lists
-  U = matrix(NA,nrow=nrow(S),ncol=rank)
-  V = matrix(NA,nrow=ncol(S),ncol=rank)
-  QU = matrix(NA,nrow=nrow(S),ncol=rank)
-  QV = matrix(NA,nrow=ncol(S),ncol=rank)
+  U = matrix(NA,nrow=nrow(X),ncol=rank)
+  V = matrix(NA,nrow=ncol(X),ncol=rank)
+  QU = matrix(NA,nrow=nrow(X),ncol=rank)
+  QV = matrix(NA,nrow=ncol(X),ncol=rank)
   U.selected = list()
   V.selected = list()
   QU.selected = list()
   QV.selected = list()
   #Create identity matrices of size P and Q
-  IU=diag(nrow(S))
-  IV=diag(ncol(S))
-  svdS = svd(S)
-  singularvalues = as.vector(svdS$d[1:rank])
-  
+  IU=diag(nrow(X))
+  IV=diag(ncol(X))
+
+  svdX <- svd(X,nu=1,nv=1)
+  initialU <- svdX$u[,1]
+  initialV <- svdX$v[,1]
+  singularvalues = as.vector(svdX$d[1:rank])
+
   for(r in 1:rank)
   {
-    #For the first sparse singular vector, 
-    #calculate the singular vector using SVDEM
+    #For the first sparse singular vector,
+    #calculate the singular vector using CBS-SVD
     #and assign them to first column of QU and QV
     if(r == 1)
     {
-      CBSSVD = CBS_SVD(S,svdS,ku=ku[r],kv=kv[r])
+      CBSSVD = CBSSVD_Base(X,initialu=initialU,initialv=initialV,ku=KU[r],kv=KV[r])
       QU[,r] = CBSSVD$u
       QV[,r] = CBSSVD$v
       U[,r] = CBSSVD$u
@@ -52,23 +81,30 @@ CBS_SVD_R <- function(S,rank=1,ku,kv,epsilon=.05)
     #############################################################################################
     else if(r > 1)
     {
-      SU_proj = t(t(S) %*% (IU - QU[,1:(r-1)] %*% t(QU[,1:(r-1)])))
-      SV_proj = (S %*% (IV - QV[,1:(r-1)] %*% t(QV[,1:(r-1)])))
-      
-      CBSSVDU = CBS_SVD(SU_proj,svd(SU_proj),ku=ku[r],kv=kv[r])
+      XU_proj = t(t(X) %*% (IU - QU[,1:(r-1)] %*% t(QU[,1:(r-1)])))
+      rownames(XU_proj) = rownames(X)
+      colnames(XU_proj) = colnames(X)
+      XV_proj = (X %*% (IV - QV[,1:(r-1)] %*% t(QV[,1:(r-1)])))
+      rownames(XV_proj) = rownames(X)
+      colnames(XV_proj) = colnames(X)
+
+      svdXU_proj <- svd(XU_proj,nu=1,nv=1)
+      svdXV_proj <- svd(XV_proj,nu=1,nv=1)
+
+      CBSSVDU = CBSSVD_Base(XU_proj,initialu=svdXU_proj$u[,1],initialv=svdXU_proj$v[,1],ku=KU[r],kv=KV[r])
       u = CBSSVDU$u
       U[,r] = u
       U.selected[[r]] = CBSSVDU$U.selected
       QU_next = (IU - QU[,1:(r-1)] %*% t(QU[,1:(r-1)])) %*% u
       QU[,r] = QU_next/norm(QU_next,type="2")
-      
-      CBSSVDV = CBS_SVD(SV_proj,svd(SV_proj),ku=ku[r],kv=kv[r])
+
+      CBSSVDV = CBSSVD_Base(XV_proj,initialu=svdXV_proj$u[,1],initialv=svdXV_proj$v[,1],ku=KU[r],kv=KV[r])
       v = CBSSVDV$v
       V[,r] = v
       V.selected[[r]] = CBSSVDV$V.selected
       QV_next = (IV - QV[,1:(r-1)] %*% t(QV[,1:(r-1)])) %*% v
       QV[,r] = QV_next/norm(QV_next,type="2")
-    }
+   }
   }
   #############################################
   # Checks the orthogonality of U,V QU,QV
@@ -78,16 +114,21 @@ CBS_SVD_R <- function(S,rank=1,ku,kv,epsilon=.05)
   U.check = t(U) %*% U
   V.check = t(V) %*% V
 
+  U_overlap <- support_overlap(U)
+  V_overlap <- support_overlap(V)
+
   return(list(rank=rank,
               epsilon=epsilon,
               D = singularvalues,
-              ku = ku,
-              kv = kv,
+              KU = KU,
+              KV = KV,
               U = U,
               V = V,
               U.selected=U.selected,
               V.selected=V.selected,
               U.check=U.check,
-              V.check=V.check))
-  
+              V.check=V.check,
+              U_overlap=U_overlap,
+              V_overlap=V_overlap))
+
 }
